@@ -1,0 +1,82 @@
+# Build artifacts
+build/
+*.o
+*.so
+*.a
+*.lib
+*.dll
+*.exe
+*.apk
+*.aar
+
+# NDK/CMake
+.cmake/
+CMakeFiles/
+cmake_install.cmake
+CMakeCache.txt
+
+# FFmpeg builds
+ffmpeg_build/
+android_build/
+*.patch
+
+# IDE caches
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+*.bak
+*.orig
+
+# Extracted TV reference binaries (large binary files)
+reference/
+original/
+*.img
+*.bin
+
+# Python caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+
+# Test outputs
+tests/*.wav
+tests/*.pcm
+tests/*.raw
+
+# Android/NDK
+local.properties
+gradle.properties
+*.keystore
+
+# Build outputs
+out/
+dist/
+*.aab
+
+# Local config
+local.mk
+config.local
+
+# Secrets / credentials
+*.pem
+*.key
+*.p12
+*.jks
+.env
+.env.*
+secrets/
+credentials/
+
+# OS / tooling
+.DS_Store
+Thumbs.db
