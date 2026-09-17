@@ -2,6 +2,7 @@
 #define SPATIAL_CHANNEL_LAYOUT_H
 
 #include <stdint.h>
+#include <stddef.h>
 #include <stdbool.h>
 
 #ifdef __cplusplus
