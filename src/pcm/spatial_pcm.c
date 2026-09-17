@@ -129,11 +129,35 @@ spatial_pcm_converter_t* spatial_pcm_converter_create(
         conv->resample_ratio = (double)output_format->sample_rate / input_format->sample_rate;
         conv->resample_filter_len = 64;
         conv->resample_filter = malloc(conv->resample_filter_len * sizeof(double));
+        if (!conv->resample_filter) {
+            free(conv);
+            return NULL;
+        }
         build_sinc_filter(conv->resample_filter, conv->resample_filter_len, 0.95 / conv->resample_ratio);
         
         conv->resample_input_size = (int)(4096 * conv->resample_ratio) + 16;
         conv->resample_input_buffer = malloc(conv->resample_input_size * 8 * sizeof(double));
+        if (!conv->resample_input_buffer) {
+            free(conv->resample_filter);
+            free(conv);
+            return NULL;
+        }
     }
+    
+    // Pre-allocate temp buffer for resampling to avoid first-use malloc in audio thread
+    int max_nb_samples = 4096;  // documented maximum frame capacity
+    if (conv->needs_resample) {
+        conv->temp_buffer = malloc(max_nb_samples * sizeof(double));
+        if (!conv->temp_buffer) {
+            free(conv->resample_filter);
+            free(conv->resample_input_buffer);
+            free(conv);
+            return NULL;
+        }
+    }
+    
+    conv->resample_pos = 0;
+    conv->resample_input_pos = 0;
     
     return conv;
 }
@@ -190,6 +214,11 @@ int spatial_pcm_converter_process(spatial_pcm_converter_t* conv,
                                   int nb_samples) {
     if (!conv || !input_data || !output_data || nb_samples <= 0) return -1;
     
+    // Documented maximum frame capacity - fail cleanly if exceeded
+    if (nb_samples > 4096) {
+        return -1;  // ERANGE would be better but keeping simple
+    }
+    
     int in_bytes = get_bytes_per_sample(conv->input_format.format);
     int out_bytes = get_bytes_per_sample(conv->output_format.format);
     bool in_planar = is_planar(conv->input_format.format);
@@ -201,6 +230,9 @@ int spatial_pcm_converter_process(spatial_pcm_converter_t* conv,
     if (conv->needs_resample) {
         int out_samples = (int)(nb_samples * conv->resample_ratio) + 1;
         
+        // temp_buffer is pre-allocated in create()
+        double* src = (double*)conv->temp_buffer;
+        
         for (int ch = 0; ch < out_channels; ch++) {
             int src_ch = conv->remap_indices[ch];
             if (src_ch < 0 || src_ch >= in_channels) {
@@ -208,18 +240,16 @@ int spatial_pcm_converter_process(spatial_pcm_converter_t* conv,
                 continue;
             }
             
-            double* src = (double*)conv->temp_buffer;
-            if (!src) {
-                src = malloc(nb_samples * sizeof(double));
-                free(conv->temp_buffer);
-                conv->temp_buffer = src;
-            }
-            
+            // Extract source channel to temp buffer
             for (int i = 0; i < nb_samples; i++) {
                 if (in_planar) {
                     const uint8_t* ch_data = input_data[src_ch] + i * in_bytes;
+                    convert_sample_format(ch_data, (uint8_t*)&src[i], 1,
+                                          conv->input_format.format, 6);  // convert to double
                 } else {
                     const uint8_t* ch_data = input_data[0] + (i * in_channels + src_ch) * in_bytes;
+                    convert_sample_format(ch_data, (uint8_t*)&src[i], 1,
+                                          conv->input_format.format, 6);  // convert to double
                 }
             }
             
