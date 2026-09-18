@@ -26,16 +26,16 @@ static void build_matrix_5_1(const spatial_config_t* config, spatial_matrix_t* m
     matrix->num_input_channels = 6;
     matrix->generation = config->generation;
     
-    matrix->matrix[SPATIAL_CHANNEL_FL][0] = config->gains_5_1[0];
-    matrix->matrix[SPATIAL_CHANNEL_FR][1] = config->gains_5_1[1];
-    matrix->matrix[SPATIAL_CHANNEL_FC][0] = config->gains_5_1[2] * C_TO_LR;
-    matrix->matrix[SPATIAL_CHANNEL_FC][1] = config->gains_5_1[2] * C_TO_LR;
-    matrix->matrix[SPATIAL_CHANNEL_LFE][0] = config->gains_5_1[4] * 1.0f;
-    matrix->matrix[SPATIAL_CHANNEL_LFE][1] = config->gains_5_1[4] * 1.0f;
-    matrix->matrix[SPATIAL_CHANNEL_SL][0] = config->gains_5_1[3] * S_TO_LR;
-    matrix->matrix[SPATIAL_CHANNEL_SL][1] = config->gains_5_1[3] * S_TO_LR;
-    matrix->matrix[SPATIAL_CHANNEL_SR][0] = config->gains_5_1[3] * S_TO_LR;
-    matrix->matrix[SPATIAL_CHANNEL_SR][1] = config->gains_5_1[3] * S_TO_LR;
+    matrix->matrix[SPATIAL_CH_FL][0] = config->gains_5_1[0];
+    matrix->matrix[SPATIAL_CH_FR][1] = config->gains_5_1[1];
+    matrix->matrix[SPATIAL_CH_FC][0] = config->gains_5_1[2] * C_TO_LR;
+    matrix->matrix[SPATIAL_CH_FC][1] = config->gains_5_1[2] * C_TO_LR;
+    matrix->matrix[SPATIAL_CH_LFE][0] = config->gains_5_1[4] * 1.0f;
+    matrix->matrix[SPATIAL_CH_LFE][1] = config->gains_5_1[4] * 1.0f;
+    matrix->matrix[SPATIAL_CH_SL][0] = config->gains_5_1[3] * S_TO_LR;
+    matrix->matrix[SPATIAL_CH_SL][1] = config->gains_5_1[3] * S_TO_LR;
+    matrix->matrix[SPATIAL_CH_SR][0] = config->gains_5_1[3] * S_TO_LR;
+    matrix->matrix[SPATIAL_CH_SR][1] = config->gains_5_1[3] * S_TO_LR;
     
     matrix->valid = true;
 }
@@ -46,20 +46,20 @@ static void build_matrix_7_1(const spatial_config_t* config, spatial_matrix_t* m
     matrix->num_input_channels = 8;
     matrix->generation = config->generation;
     
-    matrix->matrix[SPATIAL_CHANNEL_FL][0] = config->gains_7_1[0];
-    matrix->matrix[SPATIAL_CHANNEL_FR][1] = config->gains_7_1[1];
-    matrix->matrix[SPATIAL_CHANNEL_FC][0] = config->gains_7_1[2] * C_TO_LR;
-    matrix->matrix[SPATIAL_CHANNEL_FC][1] = config->gains_7_1[2] * C_TO_LR;
-    matrix->matrix[SPATIAL_CHANNEL_LFE][0] = config->gains_7_1[5] * 1.0f;
-    matrix->matrix[SPATIAL_CHANNEL_LFE][1] = config->gains_7_1[5] * 1.0f;
-    matrix->matrix[SPATIAL_CHANNEL_SL][0] = config->gains_7_1[3] * S_TO_LR;
-    matrix->matrix[SPATIAL_CHANNEL_SL][1] = config->gains_7_1[3] * S_TO_LR;
-    matrix->matrix[SPATIAL_CHANNEL_SR][0] = config->gains_7_1[3] * S_TO_LR;
-    matrix->matrix[SPATIAL_CHANNEL_SR][1] = config->gains_7_1[3] * S_TO_LR;
-    matrix->matrix[SPATIAL_CHANNEL_BL][0] = config->gains_7_1[4] * REAR_TO_LR;
-    matrix->matrix[SPATIAL_CHANNEL_BL][1] = config->gains_7_1[4] * REAR_TO_LR;
-    matrix->matrix[SPATIAL_CHANNEL_BR][0] = config->gains_7_1[4] * REAR_TO_LR;
-    matrix->matrix[SPATIAL_CHANNEL_BR][1] = config->gains_7_1[4] * REAR_TO_LR;
+    matrix->matrix[SPATIAL_CH_FL][0] = config->gains_7_1[0];
+    matrix->matrix[SPATIAL_CH_FR][1] = config->gains_7_1[1];
+    matrix->matrix[SPATIAL_CH_FC][0] = config->gains_7_1[2] * C_TO_LR;
+    matrix->matrix[SPATIAL_CH_FC][1] = config->gains_7_1[2] * C_TO_LR;
+    matrix->matrix[SPATIAL_CH_LFE][0] = config->gains_7_1[5] * 1.0f;
+    matrix->matrix[SPATIAL_CH_LFE][1] = config->gains_7_1[5] * 1.0f;
+    matrix->matrix[SPATIAL_CH_SL][0] = config->gains_7_1[3] * S_TO_LR;
+    matrix->matrix[SPATIAL_CH_SL][1] = config->gains_7_1[3] * S_TO_LR;
+    matrix->matrix[SPATIAL_CH_SR][0] = config->gains_7_1[3] * S_TO_LR;
+    matrix->matrix[SPATIAL_CH_SR][1] = config->gains_7_1[3] * S_TO_LR;
+    matrix->matrix[SPATIAL_CH_BL][0] = config->gains_7_1[4] * REAR_TO_LR;
+    matrix->matrix[SPATIAL_CH_BL][1] = config->gains_7_1[4] * REAR_TO_LR;
+    matrix->matrix[SPATIAL_CH_BR][0] = config->gains_7_1[4] * REAR_TO_LR;
+    matrix->matrix[SPATIAL_CH_BR][1] = config->gains_7_1[4] * REAR_TO_LR;
     
     matrix->valid = true;
 }

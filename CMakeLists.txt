@@ -19,8 +19,20 @@ if(ANDROID_BUILD)
     set(CMAKE_ANDROID_NATIVE_API_LEVEL 28)
 endif()
 
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(FFMPEG REQUIRED libavcodec libavutil libavformat libswresample)
+# Support explicit FFmpeg prefix (for Android cross-compile without pkg-config)
+if(FFMPEG_PREFIX)
+    set(FFMPEG_INCLUDE_DIRS "${FFMPEG_PREFIX}/include")
+    set(FFMPEG_LIBRARIES
+        "${FFMPEG_PREFIX}/lib/libavcodec.so"
+        "${FFMPEG_PREFIX}/lib/libavutil.so"
+        "${FFMPEG_PREFIX}/lib/libavformat.so"
+        "${FFMPEG_PREFIX}/lib/libswresample.so"
+    )
+    message(STATUS "Using FFmpeg from prefix: ${FFMPEG_PREFIX}")
+else()
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(FFMPEG REQUIRED libavcodec libavutil libavformat libswresample)
+endif()
 
 add_library(spatial_pcm STATIC
     src/pcm/spatial_pcm.c

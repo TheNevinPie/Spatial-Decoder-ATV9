@@ -4,6 +4,9 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#include "spatial_channel_layout.h"
+#include "spatial_pcm.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -27,49 +30,20 @@ typedef enum {
     SPATIAL_CODEC_TRUEHD = 3,
 } spatial_codec_t;
 
-typedef enum {
-    SPATIAL_SAMPLE_FMT_S16 = 0,
-    SPATIAL_SAMPLE_FMT_S32 = 1,
-    SPATIAL_SAMPLE_FMT_FLT = 2,
-    SPATIAL_SAMPLE_FMT_DBL = 3,
-    SPATIAL_SAMPLE_FMT_S16P = 4,
-    SPATIAL_SAMPLE_FMT_S32P = 5,
-    SPATIAL_SAMPLE_FMT_FLTP = 6,
-    SPATIAL_SAMPLE_FMT_DBLP = 7,
-} spatial_sample_fmt_t;
-
-typedef enum {
-    SPATIAL_CHANNEL_FL = 0,
-    SPATIAL_CHANNEL_FR = 1,
-    SPATIAL_CHANNEL_FC = 2,
-    SPATIAL_CHANNEL_LFE = 3,
-    SPATIAL_CHANNEL_SL = 4,
-    SPATIAL_CHANNEL_SR = 5,
-    SPATIAL_CHANNEL_BL = 6,
-    SPATIAL_CHANNEL_BR = 7,
-    SPATIAL_CHANNEL_MAX = 8,
-} spatial_channel_t;
-
-typedef enum {
-    SPATIAL_LAYOUT_STEREO = 0,
-    SPATIAL_LAYOUT_5_1 = 1,
-    SPATIAL_LAYOUT_7_1 = 2,
-} spatial_layout_t;
-
 typedef struct {
     spatial_codec_t codec;
     uint32_t sample_rate;
-    uint8_t channel_map[8];
+    uint8_t channel_map[SPATIAL_CH_MAX];
     uint8_t num_channels;
 } spatial_decoder_config_t;
 
 typedef struct {
-    uint8_t *data[8];
-    int linesize[8];
+    uint8_t *data[SPATIAL_CH_MAX];
+    int linesize[SPATIAL_CH_MAX];
     int nb_samples;
     int sample_rate;
     spatial_sample_fmt_t format;
-    uint8_t channel_map[8];
+    uint8_t channel_map[SPATIAL_CH_MAX];
     uint8_t num_channels;
     int64_t pts;
     int64_t duration;

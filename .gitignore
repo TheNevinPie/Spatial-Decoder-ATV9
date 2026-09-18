@@ -80,3 +80,5 @@ credentials/
 # OS / tooling
 .DS_Store
 Thumbs.db
+
+HANDOFF.md

@@ -73,18 +73,6 @@ int spatial_layout_get_channel_count(spatial_layout_t layout) {
     }
 }
 
-const char* spatial_channel_name(int channel) {
-    static const char* names[] = {"FL", "FR", "FC", "LFE", "SL", "SR", "BL", "BR"};
-    if (channel >= 0 && channel < 8) return names[channel];
-    return "UNK";
-}
-
-const char* spatial_layout_name(int layout) {
-    static const char* names[] = {"STEREO", "5.1", "7.1"};
-    if (layout >= 0 && layout < 3) return names[layout];
-    return "UNKNOWN";
-}
-
 static void build_sinc_filter(double* filter, int len, double cutoff) {
     for (int i = 0; i < len; i++) {
         double x = (i - (len - 1) / 2.0) * cutoff;

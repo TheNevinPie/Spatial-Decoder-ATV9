@@ -27,31 +27,31 @@ static const float LFE_TO_LR = 1.0f;
 static void init_default_channel_map(spatial_downmix_ctx_t* ctx) {
     switch (ctx->config.layout) {
         case SPATIAL_LAYOUT_5_1: {
-            ctx->channel_map[0] = SPATIAL_CHANNEL_FL;
-            ctx->channel_map[1] = SPATIAL_CHANNEL_FR;
-            ctx->channel_map[2] = SPATIAL_CHANNEL_FC;
-            ctx->channel_map[3] = SPATIAL_CHANNEL_LFE;
-            ctx->channel_map[4] = SPATIAL_CHANNEL_SL;
-            ctx->channel_map[5] = SPATIAL_CHANNEL_SR;
+            ctx->channel_map[0] = SPATIAL_CH_FL;
+            ctx->channel_map[1] = SPATIAL_CH_FR;
+            ctx->channel_map[2] = SPATIAL_CH_FC;
+            ctx->channel_map[3] = SPATIAL_CH_LFE;
+            ctx->channel_map[4] = SPATIAL_CH_SL;
+            ctx->channel_map[5] = SPATIAL_CH_SR;
             ctx->num_input_channels = 6;
             break;
         }
         case SPATIAL_LAYOUT_7_1: {
-            ctx->channel_map[0] = SPATIAL_CHANNEL_FL;
-            ctx->channel_map[1] = SPATIAL_CHANNEL_FR;
-            ctx->channel_map[2] = SPATIAL_CHANNEL_FC;
-            ctx->channel_map[3] = SPATIAL_CHANNEL_LFE;
-            ctx->channel_map[4] = SPATIAL_CHANNEL_SL;
-            ctx->channel_map[5] = SPATIAL_CHANNEL_SR;
-            ctx->channel_map[6] = SPATIAL_CHANNEL_BL;
-            ctx->channel_map[7] = SPATIAL_CHANNEL_BR;
+            ctx->channel_map[0] = SPATIAL_CH_FL;
+            ctx->channel_map[1] = SPATIAL_CH_FR;
+            ctx->channel_map[2] = SPATIAL_CH_FC;
+            ctx->channel_map[3] = SPATIAL_CH_LFE;
+            ctx->channel_map[4] = SPATIAL_CH_SL;
+            ctx->channel_map[5] = SPATIAL_CH_SR;
+            ctx->channel_map[6] = SPATIAL_CH_BL;
+            ctx->channel_map[7] = SPATIAL_CH_BR;
             ctx->num_input_channels = 8;
             break;
         }
         case SPATIAL_LAYOUT_STEREO:
         default: {
-            ctx->channel_map[0] = SPATIAL_CHANNEL_FL;
-            ctx->channel_map[1] = SPATIAL_CHANNEL_FR;
+            ctx->channel_map[0] = SPATIAL_CH_FL;
+            ctx->channel_map[1] = SPATIAL_CH_FR;
             ctx->num_input_channels = 2;
             break;
         }
@@ -63,39 +63,39 @@ static void build_matrix_for_layout(const spatial_downmix_config_t* config, spat
     
     switch (layout) {
         case SPATIAL_LAYOUT_5_1: {
-            matrix[SPATIAL_CHANNEL_FL][0] = config->gains_5_1.left;
-            matrix[SPATIAL_CHANNEL_FR][1] = config->gains_5_1.right;
-            matrix[SPATIAL_CHANNEL_FC][0] = config->gains_5_1.center * C_TO_LR;
-            matrix[SPATIAL_CHANNEL_FC][1] = config->gains_5_1.center * C_TO_LR;
-            matrix[SPATIAL_CHANNEL_LFE][0] = config->gains_5_1.lfe * LFE_TO_LR;
-            matrix[SPATIAL_CHANNEL_LFE][1] = config->gains_5_1.lfe * LFE_TO_LR;
-            matrix[SPATIAL_CHANNEL_SL][0] = config->gains_5_1.surround * S_TO_LR;
-            matrix[SPATIAL_CHANNEL_SL][1] = config->gains_5_1.surround * S_TO_LR;
-            matrix[SPATIAL_CHANNEL_SR][0] = config->gains_5_1.surround * S_TO_LR;
-            matrix[SPATIAL_CHANNEL_SR][1] = config->gains_5_1.surround * S_TO_LR;
+            matrix[SPATIAL_CH_FL][0] = config->gains_5_1.left;
+            matrix[SPATIAL_CH_FR][1] = config->gains_5_1.right;
+            matrix[SPATIAL_CH_FC][0] = config->gains_5_1.center * C_TO_LR;
+            matrix[SPATIAL_CH_FC][1] = config->gains_5_1.center * C_TO_LR;
+            matrix[SPATIAL_CH_LFE][0] = config->gains_5_1.lfe * LFE_TO_LR;
+            matrix[SPATIAL_CH_LFE][1] = config->gains_5_1.lfe * LFE_TO_LR;
+            matrix[SPATIAL_CH_SL][0] = config->gains_5_1.surround * S_TO_LR;
+            matrix[SPATIAL_CH_SL][1] = config->gains_5_1.surround * S_TO_LR;
+            matrix[SPATIAL_CH_SR][0] = config->gains_5_1.surround * S_TO_LR;
+            matrix[SPATIAL_CH_SR][1] = config->gains_5_1.surround * S_TO_LR;
             break;
         }
         case SPATIAL_LAYOUT_7_1: {
-            matrix[SPATIAL_CHANNEL_FL][0] = config->gains_7_1.left;
-            matrix[SPATIAL_CHANNEL_FR][1] = config->gains_7_1.right;
-            matrix[SPATIAL_CHANNEL_FC][0] = config->gains_7_1.center * C_TO_LR;
-            matrix[SPATIAL_CHANNEL_FC][1] = config->gains_7_1.center * C_TO_LR;
-            matrix[SPATIAL_CHANNEL_LFE][0] = config->gains_7_1.lfe * LFE_TO_LR;
-            matrix[SPATIAL_CHANNEL_LFE][1] = config->gains_7_1.lfe * LFE_TO_LR;
-            matrix[SPATIAL_CHANNEL_SL][0] = config->gains_7_1.side * S_TO_LR;
-            matrix[SPATIAL_CHANNEL_SL][1] = config->gains_7_1.side * S_TO_LR;
-            matrix[SPATIAL_CHANNEL_SR][0] = config->gains_7_1.side * S_TO_LR;
-            matrix[SPATIAL_CHANNEL_SR][1] = config->gains_7_1.side * S_TO_LR;
-            matrix[SPATIAL_CHANNEL_BL][0] = config->gains_7_1.rear * REAR_TO_LR;
-            matrix[SPATIAL_CHANNEL_BL][1] = config->gains_7_1.rear * REAR_TO_LR;
-            matrix[SPATIAL_CHANNEL_BR][0] = config->gains_7_1.rear * REAR_TO_LR;
-            matrix[SPATIAL_CHANNEL_BR][1] = config->gains_7_1.rear * REAR_TO_LR;
+            matrix[SPATIAL_CH_FL][0] = config->gains_7_1.left;
+            matrix[SPATIAL_CH_FR][1] = config->gains_7_1.right;
+            matrix[SPATIAL_CH_FC][0] = config->gains_7_1.center * C_TO_LR;
+            matrix[SPATIAL_CH_FC][1] = config->gains_7_1.center * C_TO_LR;
+            matrix[SPATIAL_CH_LFE][0] = config->gains_7_1.lfe * LFE_TO_LR;
+            matrix[SPATIAL_CH_LFE][1] = config->gains_7_1.lfe * LFE_TO_LR;
+            matrix[SPATIAL_CH_SL][0] = config->gains_7_1.side * S_TO_LR;
+            matrix[SPATIAL_CH_SL][1] = config->gains_7_1.side * S_TO_LR;
+            matrix[SPATIAL_CH_SR][0] = config->gains_7_1.side * S_TO_LR;
+            matrix[SPATIAL_CH_SR][1] = config->gains_7_1.side * S_TO_LR;
+            matrix[SPATIAL_CH_BL][0] = config->gains_7_1.rear * REAR_TO_LR;
+            matrix[SPATIAL_CH_BL][1] = config->gains_7_1.rear * REAR_TO_LR;
+            matrix[SPATIAL_CH_BR][0] = config->gains_7_1.rear * REAR_TO_LR;
+            matrix[SPATIAL_CH_BR][1] = config->gains_7_1.rear * REAR_TO_LR;
             break;
         }
         case SPATIAL_LAYOUT_STEREO:
         default: {
-            matrix[SPATIAL_CHANNEL_FL][0] = 1.0f;
-            matrix[SPATIAL_CHANNEL_FR][1] = 1.0f;
+            matrix[SPATIAL_CH_FL][0] = 1.0f;
+            matrix[SPATIAL_CH_FR][1] = 1.0f;
             break;
         }
     }

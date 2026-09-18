@@ -4,15 +4,11 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#include "spatial_channel_layout.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-typedef enum {
-    SPATIAL_LAYOUT_STEREO = 0,
-    SPATIAL_LAYOUT_5_1    = 1,
-    SPATIAL_LAYOUT_7_1    = 2,
-} spatial_layout_t;
 
 typedef enum {
     SPATIAL_MATRIX_NONE = 0,
@@ -23,18 +19,6 @@ typedef enum {
     SPATIAL_CONTENT_CBA = 0,
     SPATIAL_CONTENT_OBA = 1,
 } spatial_content_type_t;
-
-typedef enum {
-    SPATIAL_CHANNEL_FL  = 0,
-    SPATIAL_CHANNEL_FR  = 1,
-    SPATIAL_CHANNEL_FC  = 2,
-    SPATIAL_CHANNEL_LFE = 3,
-    SPATIAL_CHANNEL_SL  = 4,
-    SPATIAL_CHANNEL_SR  = 5,
-    SPATIAL_CHANNEL_BL  = 6,
-    SPATIAL_CHANNEL_BR  = 7,
-    SPATIAL_CHANNEL_MAX = 8,
-} spatial_channel_t;
 
 typedef struct {
     float left;
@@ -55,7 +39,7 @@ typedef struct {
 
 typedef struct {
     spatial_layout_t layout;
-    int channel_map[SPATIAL_CHANNEL_MAX];
+    int channel_map[SPATIAL_CH_MAX];
 
     spatial_gains_5_1_t gains_5_1;
     spatial_gains_7_1_t gains_7_1;

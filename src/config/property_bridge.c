@@ -100,21 +100,21 @@ void spatial_config_get_defaults(spatial_config_t* config) {
     memset(config, 0, sizeof(spatial_config_t));
     config->layout = SPATIAL_LAYOUT_5_1;
     
-    config->gains_5_1.gains[SPATIAL_CHANNEL_FL] = 1.0f;
-    config->gains_5_1.gains[SPATIAL_CHANNEL_FR] = 1.0f;
-    config->gains_5_1.gains[SPATIAL_CHANNEL_FC] = 0.90f;
-    config->gains_5_1.gains[SPATIAL_CHANNEL_LFE] = 0.25f;
-    config->gains_5_1.gains[SPATIAL_CHANNEL_SL] = 0.55f;
-    config->gains_5_1.gains[SPATIAL_CHANNEL_SR] = 0.55f;
+    config->gains_5_1.gains[SPATIAL_CH_FL] = 1.0f;
+    config->gains_5_1.gains[SPATIAL_CH_FR] = 1.0f;
+    config->gains_5_1.gains[SPATIAL_CH_FC] = 0.90f;
+    config->gains_5_1.gains[SPATIAL_CH_LFE] = 0.25f;
+    config->gains_5_1.gains[SPATIAL_CH_SL] = 0.55f;
+    config->gains_5_1.gains[SPATIAL_CH_SR] = 0.55f;
     
-    config->gains_7_1.gains[SPATIAL_CHANNEL_FL] = 1.0f;
-    config->gains_7_1.gains[SPATIAL_CHANNEL_FR] = 1.0f;
-    config->gains_7_1.gains[SPATIAL_CHANNEL_FC] = 0.760f;
-    config->gains_7_1.gains[SPATIAL_CHANNEL_LFE] = 0.030f;
-    config->gains_7_1.gains[SPATIAL_CHANNEL_SL] = 0.780f;
-    config->gains_7_1.gains[SPATIAL_CHANNEL_SR] = 0.780f;
-    config->gains_7_1.gains[SPATIAL_CHANNEL_BL] = 0.620f;
-    config->gains_7_1.gains[SPATIAL_CHANNEL_BR] = 0.620f;
+    config->gains_7_1.gains[SPATIAL_CH_FL] = 1.0f;
+    config->gains_7_1.gains[SPATIAL_CH_FR] = 1.0f;
+    config->gains_7_1.gains[SPATIAL_CH_FC] = 0.760f;
+    config->gains_7_1.gains[SPATIAL_CH_LFE] = 0.030f;
+    config->gains_7_1.gains[SPATIAL_CH_SL] = 0.780f;
+    config->gains_7_1.gains[SPATIAL_CH_SR] = 0.780f;
+    config->gains_7_1.gains[SPATIAL_CH_BL] = 0.620f;
+    config->gains_7_1.gains[SPATIAL_CH_BR] = 0.620f;
     
     config->matrix_oba = SPATIAL_MATRIX_NONE;
     config->matrix_cba = SPATIAL_MATRIX_NONE;
