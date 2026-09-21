@@ -16,6 +16,19 @@
 #include <media/MediaCodecInfo.h>
 #include <media/MediaCodec.h>
 
+#include <media/stagefright/MediaBuffer.h>
+#include <media/stagefright/MediaBufferGroup.h>
+#include <media/stagefright/MediaDefs.h>
+#include <media/stagefright/MediaSource.h>
+#include <media/stagefright/MetaData.h>
+#include <media/stagefright/foundation/hexdump.h>
+
+#include <media/stagefright/omx/OMXComponent.h>
+
+#include <media/MediaCodecList.h>
+#include <media/MediaCodecInfo.h>
+#include <media/MediaCodec.h>
+
 namespace android {
 
 // Helper function to map MIME type to spatial_codec_t
@@ -29,6 +42,15 @@ static spatial_codec_t mimeToSpatialCodec(const char* mime) {
     if (strcmp(mime, "audio/truehd") == 0) return SPATIAL_CODEC_TRUEHD;
     
     return SPATIAL_CODEC_AC3; // Default fallback
+}
+
+// Helper function to get MIME type from component role
+static const char* getMimeTypeFromRole() {
+    // This would typically be implemented by getting the component role
+    // For now, we'll use a simple approach - in a real implementation,
+    // this would query the OMX component role
+    // For now, we'll default to E-AC3 as it's the most common for Android TV
+    return "audio/eac3";
 }
 
 namespace android {

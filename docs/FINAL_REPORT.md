@@ -41,17 +41,17 @@ All host-side validation complete. The decoder/downmix foundation matches the go
 ### Documentation
 | File | Description |
 |------|-------------|
-| `analysis/PHASE_1_FINDINGS.md` | Forensic extraction findings |
-| `analysis/PHASE_2_AUDIO_PATH.md` | Verified execution graph |
-| `analysis/PHASE_3_MINIMAL_SET.md` | Minimal working set classification |
-| `analysis/PHASE_4_DECODER_RECONSTRUCTION.md` | Old decoder reconstruction |
-| `analysis/PHASE_DOWNMIX_INVESTIGATION.md` | Downmix location proof |
-| `analysis/PHASE_CODEC_SELECTION.md` | Codec selection mechanism |
-| `analysis/GOLDEN_AUDIO_REFERENCE.md` | Golden reference coefficients/behavior |
-| `analysis/MATHEMATICAL_CONTRACT.md` | Mathematical contract for downmix |
-| `analysis/FINAL_ARCHITECTURE_CANDIDATES.md` | Architecture candidates comparison |
-| `analysis/IMPLEMENTATION_PLAN.md` | Phased implementation plan |
-| `docs/MATHEMATICAL_CONTRACT.md` | Formal mathematical contract |
+| `../analysis/PHASE_1_FINDINGS.md` | Forensic extraction findings |
+| `../analysis/PHASE_2_AUDIO_PATH.md` | Verified execution graph |
+| `../analysis/PHASE_3_MINIMAL_SET.md` | Minimal working set classification |
+| `../analysis/PHASE_4_DECODER_RECONSTRUCTION.md` | Old decoder reconstruction |
+| `../analysis/PHASE_DOWNMIX_INVESTIGATION.md` | Downmix location proof |
+| `../analysis/PHASE_CODEC_SELECTION.md` | Codec selection mechanism |
+| `../analysis/GOLDEN_AUDIO_REFERENCE.md` | Golden reference coefficients/behavior |
+| `../analysis/MATHEMATICAL_CONTRACT.md` | Mathematical contract for downmix |
+| `../analysis/FINAL_ARCHITECTURE_CANDIDATES.md` | Architecture candidates comparison |
+| `../analysis/IMPLEMENTATION_PLAN.md` | Phased implementation plan |
+| `MATHEMATICAL_CONTRACT.md` | Formal mathematical contract |
 
 ---
 
