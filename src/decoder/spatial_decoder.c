@@ -12,6 +12,12 @@
 #define MAX_CHANNELS 8
 #define MAX_PACKET_SIZE (4 * 1024 * 1024)  // 4MB for test files
 
+// PROPERTY_VALUE_MAX is defined in cutils/properties.h but not available in NDK
+// Define our own if not available
+#ifndef PROPERTY_VALUE_MAX
+#define PROPERTY_VALUE_MAX 92
+#endif
+
 // Debug property check
 static bool is_debug_enabled(void) {
     char value[PROPERTY_VALUE_MAX];

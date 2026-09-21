@@ -4,6 +4,10 @@
 #include <stdio.h>
 #include <math.h>
 #include <sys/system_properties.h>
+#include <android/log.h>
+
+#define LOG_TAG "spatial_property"
+#define ALOGW(...) __android_log_print(ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__)
 
 #define PROP_PREFIX "persist.vendor.spatialdm."
 

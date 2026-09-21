@@ -54,6 +54,8 @@ target_include_directories(spatial_config PUBLIC
 )
 if(NOT ANDROID_BUILD)
     target_link_libraries(spatial_config PUBLIC rt)
+else()
+    target_link_libraries(spatial_config PUBLIC log android)
 endif()
 
 add_library(spatial_downmix STATIC
@@ -88,7 +90,7 @@ target_include_directories(spatial_all PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/downmix
     ${CMAKE_CURRENT_SOURCE_DIR}/src/omx
 )
-target_link_libraries(spatial_all PUBLIC ${FFMPEG_LIBRARIES})
+target_link_libraries(spatial_all PUBLIC ${FFMPEG_LIBRARIES} log android)
 set_target_properties(spatial_all PROPERTIES OUTPUT_NAME "spatialdecoder")
 
 # OMX Component for Android - only build when Android framework headers are available
