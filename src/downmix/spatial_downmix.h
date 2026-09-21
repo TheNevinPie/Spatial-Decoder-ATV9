@@ -5,20 +5,11 @@
 #include <stddef.h>
 
 #include "spatial_channel_layout.h"
+#include "spatial_config.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-typedef enum {
-    SPATIAL_MATRIX_NONE = 0,
-    SPATIAL_MATRIX_DPLII = 1,
-} spatial_matrix_mode_t;
-
-typedef enum {
-    SPATIAL_CONTENT_CBA = 0,
-    SPATIAL_CONTENT_OBA = 1,
-} spatial_content_type_t;
 
 typedef struct {
     float left;

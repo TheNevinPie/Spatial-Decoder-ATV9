@@ -1,31 +1,61 @@
 # Build artifacts
 build/
+build_android/
+build_host/
+build_*/
+out_android/
 *.o
+*.obj
+*.lo
 *.so
+*.so.*
+*.dylib
 *.a
 *.lib
 *.dll
 *.exe
 *.apk
 *.aar
+*.aab
+*.dSYM/
 
-# NDK/CMake
+# NDK/CMake (generated files; contain machine-specific absolute paths)
 .cmake/
 CMakeFiles/
 cmake_install.cmake
 CMakeCache.txt
+CMakeConfigureLog.yaml
+CTestTestfile.cmake
+Testing/
+DartConfiguration.tcl
+install_manifest*.txt
+compile_commands.json
+.ninja_deps
+.ninja_log
+build.ninja
 
 # FFmpeg builds
 ffmpeg_build/
+ffmpeg-android/
 android_build/
 *.patch
 
+# Backup / snapshot trees (duplicated sources + binaries)
+backup_old_decoder/
+backup*/
+
 # IDE caches
 .vscode/
+.vs/
 .idea/
+*.iml
+.gradle/
+.cxx/
 *.swp
 *.swo
 *~
+*.user
+*.suo
 
 # Temporary files
 *.tmp
@@ -33,12 +63,20 @@ android_build/
 *.log
 *.bak
 *.orig
+tags
 
-# Extracted TV reference binaries (large binary files)
+# Extracted TV reference binaries (large binary files) and fixtures
 reference/
 original/
+test_audio/
 *.img
 *.bin
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.7z
+*.rar
 
 # Python caches
 __pycache__/
@@ -47,6 +85,9 @@ __pycache__/
 *.pyd
 .pytest_cache/
 .coverage
+.venv/
+venv/
+*.egg-info/
 
 # Test outputs
 tests/*.wav
@@ -61,7 +102,6 @@ gradle.properties
 # Build outputs
 out/
 dist/
-*.aab
 
 # Local config
 local.mk
@@ -80,5 +120,8 @@ credentials/
 # OS / tooling
 .DS_Store
 Thumbs.db
+ehthumbs.db
+Desktop.ini
+.cache/
 
 HANDOFF.md

@@ -56,8 +56,14 @@ static bool read_prop_float(const char* key, float* out_value) {
     
     char* endptr;
     float val = strtof(value, &endptr);
-    if (endptr == value || *endptr != '\0') return false;
-    if (isnan(val) || isinf(val)) return false;
+    if (endptr == value || *endptr != '\0') {
+        ALOGW("Property '%s' parse failed: invalid float format '%s', using default", key, value);
+        return false;
+    }
+    if (isnan(val) || isinf(val)) {
+        ALOGW("Property '%s' parse failed: invalid float value '%s', using default", key, value);
+        return false;
+    }
     
     *out_value = val;
     return true;
@@ -70,7 +76,10 @@ static bool read_prop_int(const char* key, int* out_value) {
     
     char* endptr;
     long val = strtol(value, &endptr, 10);
-    if (endptr == value || *endptr != '\0') return false;
+    if (endptr == value || *endptr != '\0') {
+        ALOGW("Property '%s' parse failed: invalid integer format '%s', using default", key, value);
+        return false;
+    }
     
     *out_value = (int)val;
     return true;
@@ -94,44 +103,7 @@ void spatial_property_destroy(spatial_property_ctx_t* ctx) {
     }
 }
 
-void spatial_config_get_defaults(spatial_config_t* config) {
-    if (!config) return;
-    
-    memset(config, 0, sizeof(spatial_config_t));
-    config->layout = SPATIAL_LAYOUT_5_1;
-    
-    config->gains_5_1.gains[SPATIAL_CH_FL] = 1.0f;
-    config->gains_5_1.gains[SPATIAL_CH_FR] = 1.0f;
-    config->gains_5_1.gains[SPATIAL_CH_FC] = 0.90f;
-    config->gains_5_1.gains[SPATIAL_CH_LFE] = 0.25f;
-    config->gains_5_1.gains[SPATIAL_CH_SL] = 0.55f;
-    config->gains_5_1.gains[SPATIAL_CH_SR] = 0.55f;
-    
-    config->gains_7_1.gains[SPATIAL_CH_FL] = 1.0f;
-    config->gains_7_1.gains[SPATIAL_CH_FR] = 1.0f;
-    config->gains_7_1.gains[SPATIAL_CH_FC] = 0.760f;
-    config->gains_7_1.gains[SPATIAL_CH_LFE] = 0.030f;
-    config->gains_7_1.gains[SPATIAL_CH_SL] = 0.780f;
-    config->gains_7_1.gains[SPATIAL_CH_SR] = 0.780f;
-    config->gains_7_1.gains[SPATIAL_CH_BL] = 0.620f;
-    config->gains_7_1.gains[SPATIAL_CH_BR] = 0.620f;
-    
-    config->matrix_oba = SPATIAL_MATRIX_NONE;
-    config->matrix_cba = SPATIAL_MATRIX_NONE;
-    config->content_type = SPATIAL_CONTENT_CBA;
-    config->debug_enabled = false;
-    config->generation = 0;
-}
 
-void spatial_config_copy(const spatial_config_t* src, spatial_config_t* dst) {
-    if (!src || !dst) return;
-    memcpy(dst, src, sizeof(spatial_config_t));
-}
-
-bool spatial_config_equal(const spatial_config_t* a, const spatial_config_t* b) {
-    if (!a || !b) return false;
-    return memcmp(a, b, sizeof(spatial_config_t)) == 0;
-}
 
 bool spatial_property_validate_gain(float value) {
     return !isnan(value) && !isinf(value) && value >= 0.0f;
@@ -155,8 +127,13 @@ int spatial_property_read_all(spatial_property_ctx_t* ctx, spatial_config_t* out
     spatial_config_get_defaults(out_config);
     
     int layout_val;
-    if (read_prop_int(PROP_LAYOUT, &layout_val) && spatial_property_validate_layout(layout_val)) {
-        out_config->layout = (spatial_layout_t)layout_val;
+    if (read_prop_int(PROP_LAYOUT, &layout_val)) {
+        if (spatial_property_validate_layout(layout_val)) {
+            out_config->layout = (spatial_layout_t)layout_val;
+        } else {
+            ALOGW("Property '%s' validation failed: layout=%d (valid range: %d-%d), using default",
+                  PROP_LAYOUT, layout_val, SPATIAL_LAYOUT_STEREO, SPATIAL_LAYOUT_7_1);
+        }
     }
     
     int debug_val;
@@ -166,23 +143,43 @@ int spatial_property_read_all(spatial_property_ctx_t* ctx, spatial_config_t* out
     
     float gain_val;
     for (int i = 0; i < 5; i++) {
-        if (read_prop_float(gain_5_1_names[i], &gain_val) && spatial_property_validate_gain(gain_val)) {
-            out_config->gains_5_1.gains[i] = gain_val;
+        if (read_prop_float(gain_5_1_names[i], &gain_val)) {
+            if (spatial_property_validate_gain(gain_val)) {
+                out_config->gains_5_1[i] = gain_val;
+            } else {
+                ALOGW("Property '%s' validation failed: gain=%.3f (must be >= 0), using default",
+                      gain_5_1_names[i], gain_val);
+            }
         }
     }
     
     for (int i = 0; i < 6; i++) {
-        if (read_prop_float(gain_7_1_names[i], &gain_val) && spatial_property_validate_gain(gain_val)) {
-            out_config->gains_7_1.gains[i] = gain_val;
+        if (read_prop_float(gain_7_1_names[i], &gain_val)) {
+            if (spatial_property_validate_gain(gain_val)) {
+                out_config->gains_7_1[i] = gain_val;
+            } else {
+                ALOGW("Property '%s' validation failed: gain=%.3f (must be >= 0), using default",
+                      gain_7_1_names[i], gain_val);
+            }
         }
     }
     
     int matrix_val;
-    if (read_prop_int(PROP_MATRIX_OBA, &matrix_val) && spatial_property_validate_matrix_mode(matrix_val)) {
-        out_config->matrix_oba = (spatial_matrix_mode_t)matrix_val;
+    if (read_prop_int(PROP_MATRIX_OBA, &matrix_val)) {
+        if (spatial_property_validate_matrix_mode(matrix_val)) {
+            out_config->matrix_oba = (spatial_matrix_mode_t)matrix_val;
+        } else {
+            ALOGW("Property '%s' validation failed: matrix_mode=%d (valid range: %d-%d), using default",
+                  PROP_MATRIX_OBA, matrix_val, SPATIAL_MATRIX_NONE, SPATIAL_MATRIX_DPLII);
+        }
     }
-    if (read_prop_int(PROP_MATRIX_CBA, &matrix_val) && spatial_property_validate_matrix_mode(matrix_val)) {
-        out_config->matrix_cba = (spatial_matrix_mode_t)matrix_val;
+    if (read_prop_int(PROP_MATRIX_CBA, &matrix_val)) {
+        if (spatial_property_validate_matrix_mode(matrix_val)) {
+            out_config->matrix_cba = (spatial_matrix_mode_t)matrix_val;
+        } else {
+            ALOGW("Property '%s' validation failed: matrix_mode=%d (valid range: %d-%d), using default",
+                  PROP_MATRIX_CBA, matrix_val, SPATIAL_MATRIX_NONE, SPATIAL_MATRIX_DPLII);
+        }
     }
     
     char content_str[32];
@@ -191,6 +188,8 @@ int spatial_property_read_all(spatial_property_ctx_t* ctx, spatial_config_t* out
             out_config->content_type = SPATIAL_CONTENT_OBA;
         } else if (strcmp(content_str, "cba") == 0) {
             out_config->content_type = SPATIAL_CONTENT_CBA;
+        } else {
+            ALOGW("Property 'persist.vendor.spatialdm.content_type' invalid value '%s', using default", content_str);
         }
     }
     

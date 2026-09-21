@@ -1,0 +1,72 @@
+// Spatial Decoder Library - Android.bp for Soong Build System
+// Place in: vendor/mediatek/proprietary/hardware/audio/spatial_decoder/Android.bp
+
+cc_library_shared {
+    name: "libspatialdecoder",
+    vendor: true,
+    proprietary: true,
+    owner: "mediatek",
+
+    srcs: [
+        "src/decoder/spatial_decoder.c",
+        "src/pcm/spatial_pcm.c",
+        "src/pcm/spatial_channel_layout.c",
+        "src/config/spatial_config.c",
+        "src/config/property_bridge.c",
+        "src/downmix/spatial_downmix.c",
+    ],
+
+    include_dirs: [
+        "include",
+        "src/decoder",
+        "src/pcm",
+        "src/config",
+        "src/downmix",
+    ],
+
+    cflags: [
+        "-std=c11",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-DANDROID",
+        "-DANDROID_SMP=1",
+        "-DANDROID_BUILD",
+        "-DANDROID_API=28",
+        "-march=armv7-a",
+        "-mthumb",
+        "-mfpu=neon",
+        "-O2",
+        "-fPIC",
+        "-fvisibility=hidden",
+    ],
+
+    shared_libs: [
+        "libavcodec",
+        "libavutil",
+        "libavformat",
+        "libswresample",
+        "liblog",
+        "libcutils",
+        "libutils",
+        "libdl",
+    ],
+
+    cflags: [
+        "-std=c11",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+    ],
+
+    compile_multilib: "32",
+    target: {
+        android_arm: {
+            cflags: [
+                "-march=armv7-a",
+                "-mthumb",
+                "-mfpu=neon",
+            ],
+        },
+    },
+}

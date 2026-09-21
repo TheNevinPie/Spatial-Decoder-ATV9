@@ -33,6 +33,7 @@ typedef enum {
 typedef struct {
     spatial_codec_t codec;
     uint32_t sample_rate;
+    spatial_layout_t layout;
     uint8_t channel_map[SPATIAL_CH_MAX];
     uint8_t num_channels;
 } spatial_decoder_config_t;

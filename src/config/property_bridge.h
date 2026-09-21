@@ -5,37 +5,13 @@
 #include <stdbool.h>
 
 #include "spatial_channel_layout.h"
+#include "spatial_config.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-typedef enum {
-    SPATIAL_MATRIX_NONE = 0,
-    SPATIAL_MATRIX_DPLII = 1,
-} spatial_matrix_mode_t;
-
-typedef enum {
-    SPATIAL_CONTENT_CBA = 0,
-    SPATIAL_CONTENT_OBA = 1,
-} spatial_content_type_t;
-
 typedef spatial_channel_t spatial_channel_id_t;
-
-typedef struct {
-    float gains[SPATIAL_CH_MAX];
-} spatial_gains_t;
-
-typedef struct {
-    spatial_layout_t layout;
-    spatial_gains_t gains_5_1;
-    spatial_gains_t gains_7_1;
-    spatial_matrix_mode_t matrix_oba;
-    spatial_matrix_mode_t matrix_cba;
-    spatial_content_type_t content_type;
-    bool debug_enabled;
-    uint64_t generation;
-} spatial_config_t;
 
 typedef struct spatial_property_ctx spatial_property_ctx_t;
 

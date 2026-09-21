@@ -1,4 +1,4 @@
-#include "spatial_decoder.h"
+﻿#include "spatial_decoder.h"
 #include "spatial_downmix.h"
 #include "spatial_pcm.h"
 #include "spatial_channel_layout.h"
@@ -7,208 +7,240 @@
 #include <string.h>
 #include <math.h>
 
-static void analyze_stereo(const int16_t* data, int frames, float* rms_l, float* rms_r, float* peak_l, float* peak_r) {
-    float sum_l = 0, sum_r = 0;
-    float p_l = 0, p_r = 0;
-    
-    for (int i = 0; i < frames; i++) {
-        float l = data[i * 2] / 32768.0f;
-        float r = data[i * 2 + 1] / 32768.0f;
-        sum_l += l * l;
-        sum_r += r * r;
-        if (fabsf(l) > p_l) p_l = fabsf(l);
-        if (fabsf(r) > p_r) p_r = fabsf(r);
+#define STREAM_BUF_SIZE (32 * 1024)
+#define MAX_FRAME_SAMPLES 48000
+
+typedef struct {
+    float sum_sq[SPATIAL_CH_MAX];
+    float peak[SPATIAL_CH_MAX];
+    int frame_count;
+    int total_samples;
+    int total_decoded;
+} decode_stats_t;
+
+static void process_frame(spatial_pcm_converter_t* pcm_conv,
+                          const spatial_frame_t* frame,
+                          decode_stats_t* stats) {
+    int nch = frame->num_channels;
+    if (nch > SPATIAL_CH_MAX) nch = SPATIAL_CH_MAX;
+    if (nch <= 0 || frame->nb_samples <= 0) return;
+
+    float* channel_data[SPATIAL_CH_MAX] = {0};
+    float out_buffers[SPATIAL_CH_MAX][MAX_FRAME_SAMPLES];
+    uint8_t* out_ptrs[SPATIAL_CH_MAX] = {0};
+
+    for (int ch = 0; ch < nch; ch++) {
+        channel_data[ch] = (float*)frame->data[ch];
+        out_ptrs[ch] = (uint8_t*)out_buffers[ch];
     }
-    
-    *rms_l = sqrtf(sum_l / frames);
-    *rms_r = sqrtf(sum_r / frames);
-    *peak_l = p_l;
-    *peak_r = p_r;
+
+    stats->frame_count++;
+    if (stats->frame_count <= 3) {
+        printf("  Frame %d: %d samples, sr=%d, ch=%d, fmt=%d\n",
+               stats->frame_count, frame->nb_samples, frame->sample_rate,
+               frame->num_channels, frame->format);
+    }
+
+    int conv_ret = spatial_pcm_converter_process(pcm_conv,
+                                                 (const uint8_t* const*)channel_data,
+                                                 out_ptrs,
+                                                 frame->nb_samples);
+    if (conv_ret == 0) {
+        for (int ch = 0; ch < nch; ch++) {
+            for (int i = 0; i < frame->nb_samples; i++) {
+                float v = out_buffers[ch][i];
+                stats->sum_sq[ch] += v * v;
+                float av = fabsf(v);
+                if (av > stats->peak[ch]) stats->peak[ch] = av;
+            }
+        }
+        stats->total_samples += frame->nb_samples;
+    }
+
+    stats->total_decoded += frame->nb_samples;
 }
 
-static int read_file(const char* path, uint8_t** out_data, size_t* out_size) {
-    FILE* f = fopen(path, "rb");
-    if (!f) return -1;
-    
-    fseek(f, 0, SEEK_END);
-    long size = ftell(f);
-    fseek(f, 0, SEEK_SET);
-    
-    uint8_t* data = malloc(size);
-    if (!data) {
-        fclose(f);
-        return -1;
+static int drain_frames(spatial_decoder_t* decoder,
+                        spatial_pcm_converter_t* pcm_conv,
+                        decode_stats_t* stats) {
+    spatial_frame_t frame = {0};
+
+    while (1) {
+        int ret = spatial_decoder_receive_frame(decoder, &frame);
+        if (ret == SPATIAL_DECODER_AGAIN) break;
+        if (ret < 0) {
+            if (ret == SPATIAL_DECODER_ERROR_EOF) break;
+            printf("Decode error: %s\n", spatial_decoder_strerror(ret));
+            return -1;
+        }
+        process_frame(pcm_conv, &frame, stats);
     }
-    
-    if (fread(data, 1, size, f) != size) {
-        free(data);
-        fclose(f);
-        return -1;
-    }
-    
-    fclose(f);
-    *out_data = data;
-    *out_size = size;
+
     return 0;
 }
 
 static void test_decoder_format(const char* filepath, spatial_codec_t codec, const char* name) {
     printf("\n=== Testing %s (%s) ===\n", name, filepath);
-    
-    uint8_t* data = NULL;
-    size_t size = 0;
-    if (read_file(filepath, &data, &size) < 0) {
-        printf("Failed to read %s\n", filepath);
+
+    FILE* file = fopen(filepath, "rb");
+    if (!file) {
+        printf("Failed to open %s\n", filepath);
         return;
     }
-    
+
     spatial_decoder_config_t config = {0};
     config.codec = codec;
     config.sample_rate = 48000;
     config.num_channels = 6;
-    config.channel_map[0] = 0;
-    config.channel_map[1] = 1;
-    config.channel_map[2] = 2;
-    config.channel_map[3] = 3;
-    config.channel_map[4] = 4;
-    config.channel_map[5] = 5;
-    
+    for (int i = 0; i < 6; i++) {
+        config.channel_map[i] = (uint8_t)i;
+    }
+
     spatial_decoder_t* decoder = spatial_decoder_create(&config);
     if (!decoder) {
         printf("Failed to create decoder\n");
-        free(data);
+        fclose(file);
         return;
     }
-    
+
+    printf("Decoder created\n");
+
     int ret = spatial_decoder_open(decoder);
     if (ret != 0) {
         printf("Failed to open decoder: %s\n", spatial_decoder_strerror(ret));
         spatial_decoder_destroy(decoder);
-        free(data);
+        fclose(file);
         return;
     }
-    
-    spatial_downmix_config_t dm_config;
-    spatial_downmix_get_default_config_5_1(&dm_config);
-    dm_config.gains_5_1.center = 1.0f;
-    dm_config.gains_5_1.surround = 1.0f;
-    dm_config.gains_5_1.lfe = 1.0f;
-    
-    spatial_downmix_ctx_t* downmix = spatial_downmix_create(&dm_config);
-    
+
+    printf("Decoder opened successfully\n");
+
     spatial_pcm_format_t dec_format = {0};
-    dec_format.format = 6;
+    dec_format.format = SPATIAL_SAMPLE_FMT_FLTP;
     dec_format.sample_rate = 48000;
-    dec_format.layout = 1;
+    dec_format.layout = SPATIAL_LAYOUT_5_1;
     dec_format.num_channels = 6;
-    dec_format.channel_map[0] = 0;
-    dec_format.channel_map[1] = 1;
-    dec_format.channel_map[2] = 2;
-    dec_format.channel_map[3] = 3;
-    dec_format.channel_map[4] = 4;
-    dec_format.channel_map[5] = 5;
-    
-    spatial_pcm_format_t dm_format = {0};
-    dm_format.format = 6;
-    dm_format.sample_rate = 48000;
-    dm_format.layout = 1;
-    dm_format.num_channels = 6;
-    dm_format.channel_map[0] = 0;
-    dm_format.channel_map[1] = 1;
-    dm_format.channel_map[2] = 2;
-    dm_format.channel_map[3] = 3;
-    dm_format.channel_map[4] = 4;
-    dm_format.channel_map[5] = 5;
-    
-    spatial_pcm_converter_t* pcm_conv = spatial_pcm_converter_create(&dec_format, &dm_format);
-    
-    spatial_frame_t frame = {0};
-    int ret = spatial_decoder_send_packet(decoder, data, size, 0);
-    if (ret < 0) {
-        printf("Failed to send packet: %s\n", spatial_decoder_strerror(ret));
-        goto cleanup;
+    for (int i = 0; i < 6; i++) {
+        dec_format.channel_map[i] = (uint8_t)i;
     }
-    
-    float frames[8][48000];
-    float* frame_ptrs[8];
-    for (int i = 0; i < 8; i++) frame_ptrs[i] = frames[i];
-    
-    int total_frames = 0;
-    float max_peak_l = 0, max_peak_r = 0;
-    float rms_l = 0, rms_r = 0;
-    
-    spatial_frame_t frame_out = {0};
-    int total_decoded = 0;
-    
-    while (1) {
-        int ret = spatial_decoder_receive_frame(decoder, &frame_out);
-        if (ret == -11) {
-            break;
-        } else if (ret < 0) {
-            if (ret != -7) {
-                printf("Decode error: %s\n", spatial_decoder_strerror(ret));
+
+    spatial_pcm_format_t out_format = dec_format;
+
+    spatial_pcm_converter_t* pcm_conv = spatial_pcm_converter_create(&dec_format, &out_format);
+    if (!pcm_conv) {
+        printf("Failed to create PCM converter\n");
+        spatial_decoder_destroy(decoder);
+        fclose(file);
+        return;
+    }
+
+    decode_stats_t stats = {0};
+    uint8_t buffer[STREAM_BUF_SIZE];
+    size_t bytes_in_buffer = 0;
+    size_t total_consumed = 0;
+    int eof = 0;
+    int send_failed = 0;
+
+    printf("  Streaming with %d KB sliding buffer...\n", STREAM_BUF_SIZE / 1024);
+
+    while (!send_failed) {
+        if (!eof && bytes_in_buffer < STREAM_BUF_SIZE) {
+            size_t space = STREAM_BUF_SIZE - bytes_in_buffer;
+            size_t got = fread(buffer + bytes_in_buffer, 1, space, file);
+            bytes_in_buffer += got;
+            if (got == 0) {
+                if (ferror(file)) {
+                    printf("Read error after %zu bytes\n", total_consumed + bytes_in_buffer);
+                    send_failed = 1;
+                    break;
+                }
+                if (feof(file)) eof = 1;
             }
+        }
+
+        if (bytes_in_buffer == 0) break;
+
+        int consumed = spatial_decoder_send_packet(decoder, buffer, bytes_in_buffer, 0);
+        if (consumed < 0) {
+            printf("Failed to send packet: %s\n", spatial_decoder_strerror(consumed));
+            send_failed = 1;
             break;
         }
-        
-        int nb_samples = frame_out.nb_samples;
-        total_decoded += nb_samples;
-        
-        uint8_t* planar_ptrs[8];
-        for (int ch = 0; ch < 6; ch++) {
-            planar_ptrs[ch] = frame_out.data[ch];
+
+        if (consumed > 0) {
+            total_consumed += (size_t)consumed;
+            if ((size_t)consumed < bytes_in_buffer) {
+                memmove(buffer, buffer + (size_t)consumed, bytes_in_buffer - (size_t)consumed);
+            }
+            bytes_in_buffer -= (size_t)consumed;
+        } else if (bytes_in_buffer == STREAM_BUF_SIZE) {
+            printf("  Error: parser made no progress on a full %d KB buffer (unrecognized data after %zu bytes)\n",
+                   STREAM_BUF_SIZE / 1024, total_consumed);
+            send_failed = 1;
+            break;
+        } else if (eof) {
+            printf("  Warning: %zu trailing byte(s) not recognized; stopping\n", bytes_in_buffer);
+            bytes_in_buffer = 0;
+            break;
         }
-        
-        spatial_pcm_converter_process(pcm_conv, (const uint8_t* const*)planar_ptrs,
-                                     (uint8_t**)frame_ptrs, frame_out.nb_samples);
-        
-        int16_t stereo_out[48000];
-        int out_samples = frame_out.nb_samples * 2;
-        
-        spatial_pcm_format_t stereo_fmt = {0};
-        stereo_fmt.format = 0;
-        stereo_fmt.sample_rate = 48000;
-        stereo_fmt.layout = 0;
-        stereo_fmt.num_channels = 2;
-        
-        spatial_pcm_converter_t* to_stereo = spatial_pcm_converter_create(&dm_format, &stereo_fmt);
-        uint8_t* stereo_ptrs[2] = {(uint8_t*)stereo_out, (uint8_t*)(stereo_out + out_samples / 2)};
-        spatial_pcm_converter_process(to_stereo, (const uint8_t* const*)frame_ptrs,
-                                     (uint8_t**)stereo_ptrs, frame_out.nb_samples);
-        spatial_pcm_converter_destroy(to_stereo);
-        
-        float rms_l, rms_r, peak_l, peak_r;
-        analyze_stereo(stereo_out, frame_out.nb_samples, &rms_l, &rms_r, &rms_l, &rms_r);
-        
-        if (rms_l > 0) rms_l = (rms_l * total_frames + rms_l * frame_out.nb_samples) / (total_frames + frame_out.nb_samples);
-        if (rms_r > 0) rms_r = (rms_r * total_frames + rms_r * frame_out.nb_samples) / (total_frames + frame_out.nb_samples);
-        
-        total_frames += frame_out.nb_samples;
+
+        if (drain_frames(decoder, pcm_conv, &stats) < 0) {
+            send_failed = 1;
+            break;
+        }
     }
-    
-    if (total_decoded > 0) {
-        printf("  Decoded: %d frames\n", total_decoded);
-        printf("  Channels: %d, Sample rate: %d Hz\n", 6, 48000);
-        printf("  Format: FLTP\n");
+
+    if (send_failed) {
+        printf("  Decoding failed after %zu bytes\n", total_consumed);
+    } else {
+        printf("  File sent successfully (%zu bytes)\n", total_consumed);
+
+        if (drain_frames(decoder, pcm_conv, &stats) < 0) {
+            printf("  Failed to drain remaining frames\n");
+        }
+
+        if (stats.total_decoded > 0) {
+            printf("\n=== Channel ID Verification ===\n");
+            printf("Total frames: %d, Total samples: %d\n", stats.frame_count, stats.total_samples);
+            printf("Format: Float planar (FLTP)\n\n");
+
+            const char* ch_names[6] = {"FL", "FR", "C", "LFE", "SL", "SR"};
+            const float expected_freqs[6] = {440.0f, 550.0f, 660.0f, 80.0f, 770.0f, 880.0f};
+
+            printf("%-4s %10s %10s %10s %10s\n", "Ch", "Name", "RMS", "Peak", "Expected_Hz");
+            printf("--------------------------------------------------\n");
+
+            for (int ch = 0; ch < 6; ch++) {
+                if (stats.total_samples > 0) {
+                    float rms = sqrtf(stats.sum_sq[ch] / stats.total_samples);
+                    printf("%2d  %-4s %10.6f %10.6f %10.1f\n",
+                           ch, ch_names[ch], rms, stats.peak[ch], expected_freqs[ch]);
+                }
+            }
+
+            printf("\nTotal decoded: %d frames (%d samples)\n", stats.frame_count, stats.total_samples);
+        } else {
+            printf("  No frames decoded\n");
+        }
+
+        printf("\n");
     }
-    
-cleanup:
-    if (pcm_conv) spatial_pcm_converter_destroy(pcm_conv);
-    if (downmix) spatial_downmix_destroy(downmix);
+
+    spatial_pcm_converter_destroy(pcm_conv);
     spatial_decoder_destroy(decoder);
-    free(data);
+    fclose(file);
 }
 
 int main(int argc, char** argv) {
     printf("========================================\n");
-    printf("Spatial Decoder - FFmpeg Backend Test\n");
+    printf("Spatial Decoder - Channel ID Verification\n");
     printf("========================================\n");
     
     if (argc < 2) {
         printf("Usage: %s <test_audio_dir>\n", argv[0]);
         printf("Expected files:\n");
         printf("  test_ac3_51_chid.ac3\n");
-        printf("  test_eac3_51_chid.ec3\n");
+        printf("  test_eac3_51.ec3\n");
         printf("  test_eac3_71_chid.ec3\n");
         printf("  test_dts_51_chid.dts\n");
         printf("  test_truehd_51_chid.thd\n");
@@ -220,7 +252,7 @@ int main(int argc, char** argv) {
     snprintf(path, sizeof(path), "%s/test_ac3_51_chid.ac3", argv[1]);
     test_decoder_format(path, 0, "AC-3 5.1");
     
-    snprintf(path, sizeof(path), "%s/test_eac3_51_chid.ec3", argv[1]);
+    snprintf(path, sizeof(path), "%s/test_eac3_51.ec3", argv[1]);
     test_decoder_format(path, 1, "E-AC-3 5.1");
     
     snprintf(path, sizeof(path), "%s/test_eac3_71_chid.ec3", argv[1]);

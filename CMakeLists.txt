@@ -50,6 +50,7 @@ add_library(spatial_config STATIC
 )
 target_include_directories(spatial_config PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/config
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/pcm
 )
 if(NOT ANDROID_BUILD)
     target_link_libraries(spatial_config PUBLIC rt)
@@ -61,6 +62,7 @@ add_library(spatial_downmix STATIC
 target_include_directories(spatial_downmix PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/downmix
     ${CMAKE_CURRENT_SOURCE_DIR}/src/config
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/pcm
 )
 target_link_libraries(spatial_downmix PUBLIC spatial_config spatial_pcm)
 
@@ -84,9 +86,49 @@ target_include_directories(spatial_all PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/pcm
     ${CMAKE_CURRENT_SOURCE_DIR}/src/config
     ${CMAKE_CURRENT_SOURCE_DIR}/src/downmix
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/omx
 )
 target_link_libraries(spatial_all PUBLIC ${FFMPEG_LIBRARIES})
 set_target_properties(spatial_all PROPERTIES OUTPUT_NAME "spatialdecoder")
+
+# OMX Component for Android - only build when Android framework headers are available
+# This requires the full Android source tree with Soong build system
+if(ANDROID_BUILD AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/omx/SoftAc3Omx.cpp")
+    option(BUILD_OMX_COMPONENT "Build OMX component (requires Android framework headers)" OFF)
+    if(BUILD_OMX_COMPONENT)
+        enable_language(CXX)
+        add_library(stagefright_soft_ac3dec SHARED
+            src/omx/SoftAc3Omx.cpp
+        )
+        target_include_directories(stagefright_soft_ac3dec PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/omx
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/decoder
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/pcm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/config
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/downmix
+            ${FFMPEG_INCLUDE_DIRS}
+        )
+        target_link_libraries(stagefright_soft_ac3dec
+            spatial_decoder
+            spatial_pcm
+            spatial_downmix
+            spatial_config
+            ${FFMPEG_LIBRARIES}
+            log
+            dl
+            cutils
+            utils
+            stagefright_foundation
+            stagefright_omx
+            stagefright
+        )
+        set_target_properties(stagefright_soft_ac3dec PROPERTIES
+            OUTPUT_NAME "stagefright_soft_ac3dec"
+            PREFIX ""
+            SUFFIX ".so"
+        )
+    endif()
+endif()
 
 if(BUILD_TESTS)
     enable_testing()
