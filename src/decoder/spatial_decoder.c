@@ -12,6 +12,14 @@
 #define MAX_CHANNELS 8
 #define MAX_PACKET_SIZE (4 * 1024 * 1024)  // 4MB for test files
 
+// EAGAIN staging: a parsed packet that avcodec_send_packet() refused
+// (decoder holds an undrained frame) must be preserved across calls:
+// av_parser_parse2 output aliases parser-internal memory, valid only
+// until the next parse call, so it cannot simply be left behind.
+// Fixed-size, allocated once with the decoder (never on the audio path).
+// 128 KB covers the largest audio access units (MLP max frame: 63768 B).
+#define STAGED_PACKET_CAP (128 * 1024)
+
 // PROPERTY_VALUE_MAX is defined in cutils/properties.h but not available in NDK
 // Define our own if not available
 #ifndef PROPERTY_VALUE_MAX
@@ -42,6 +50,10 @@ struct spatial_decoder {
     spatial_frame_t current_frame;
     uint8_t packet_buffer[MAX_PACKET_SIZE];
     size_t packet_buffer_size;
+    // Unsent parsed packet (see parse_packet stop-and-drain below).
+    uint8_t staged_packet[STAGED_PACKET_CAP];
+    size_t staged_size;
+    int64_t staged_pts;
 };
 
 static int codec_to_ffmpeg(spatial_codec_t codec) {
@@ -238,10 +250,8 @@ int spatial_decoder_close(spatial_decoder_t* decoder) {
 }
 
 static int parse_packet(spatial_decoder_t* decoder, const uint8_t* data, size_t size, int64_t pts) {
-    int ret = 0;
     int consumed = 0;
-    AVFrame* temp_frame = av_frame_alloc();
-    
+
     while (consumed < (int)size) {
         int used = av_parser_parse2(
             decoder->parser,
@@ -254,67 +264,86 @@ static int parse_packet(spatial_decoder_t* decoder, const uint8_t* data, size_t 
             AV_NOPTS_VALUE,
             0
         );
-        
+
         if (used < 0) {
             DEBUG_PRINT("[spatial_decoder] parser error: %d\n", used);
-            av_frame_free(&temp_frame);
             return -5;
         }
-        
+
         if (used == 0) {
             // Parser needs more data but we've consumed all available input
             // This can happen if the remaining data is less than a complete frame
             break;
         }
-        
+
         consumed += used;
-        
+
         if (decoder->packet->size > 0) {
-            // Handle EAGAIN by draining frames and retrying
-            while (1) {
-                ret = avcodec_send_packet(decoder->codec_ctx, decoder->packet);
-                if (ret == AVERROR(EAGAIN)) {
-                    // Output buffer full - drain frames and retry
-                    while (1) {
-                        int recv_ret = avcodec_receive_frame(decoder->codec_ctx, temp_frame);
-                        if (recv_ret == AVERROR(EAGAIN) || recv_ret == AVERROR_EOF) {
-                            break;
-                        } else if (recv_ret < 0) {
-                            char errbuf[128];
-DEBUG_PRINT("[spatial_decoder] avcodec_receive_frame failed: %s\n", errbuf);
-                            av_frame_free(&temp_frame);
-                            return -5;
-                        }
-                        // Frame received, continue draining
-                    }
-                    // After draining, retry the same packet
-                    continue;
-                } else if (ret < 0) {
-                    char errbuf[128];
-DEBUG_PRINT("[spatial_decoder] avcodec_send_packet failed: %s\n", errbuf);
-                    av_frame_free(&temp_frame);
+            int ret = avcodec_send_packet(decoder->codec_ctx, decoder->packet);
+            if (ret == AVERROR(EAGAIN)) {
+                // Stop-and-drain: the decoder still holds an undrained
+                // frame, so it refuses new input. Stage this parsed
+                // packet (copy: parser output aliases parser-internal
+                // memory, invalid after the next parse call) and report
+                // progress so far WITHOUT discarding anything. The caller
+                // drains via spatial_decoder_receive_frame() and the
+                // staged packet is sent first on a later send_packet()
+                // call, preserving order.
+                if (decoder->packet->size > (int)sizeof(decoder->staged_packet)) {
+                    DEBUG_PRINT("[spatial_decoder] staged packet too large: %d\n",
+                                decoder->packet->size);
                     return -5;
-                } else {
-                    break; // Successfully sent
                 }
+                memcpy(decoder->staged_packet, decoder->packet->data,
+                       decoder->packet->size);
+                decoder->staged_size = decoder->packet->size;
+                decoder->staged_pts = pts;
+                break;
+            } else if (ret < 0) {
+                char errbuf[128];
+                av_strerror(ret, errbuf, sizeof(errbuf));
+                DEBUG_PRINT("[spatial_decoder] avcodec_send_packet failed: %s\n", errbuf);
+                return -5;
             }
+            // Successfully sent; keep parsing.
         }
     }
-    
-    av_frame_free(&temp_frame);
+
     return consumed;  // Return number of bytes consumed
 }
 
 int spatial_decoder_send_packet(spatial_decoder_t* decoder, const uint8_t* data, size_t size, int64_t pts) {
-    if (!decoder || !data || size == 0) return -1;
-    
+    if (!decoder) return -1;
+    /* NOTE: staged retry precedes the data/size guard on purpose so a
+       sizeless retry call (size 0) can still flush a tail-staged packet
+       when the stream is dry (e.g. at EOS with mStreamValid == 0). */
+
+    // A staged packet from an earlier EAGAIN stop takes precedence to
+    // preserve decode order. No new input is consumed until it is sent.
+    if (decoder->staged_size > 0) {
+        decoder->packet->data = decoder->staged_packet;
+        decoder->packet->size = (int)decoder->staged_size;
+        decoder->packet->pts = decoder->staged_pts;
+        int ret = avcodec_send_packet(decoder->codec_ctx, decoder->packet);
+        if (ret == AVERROR(EAGAIN)) {
+            return 0;  // Still blocked; caller drains and retries.
+        } else if (ret < 0) {
+            decoder->staged_size = 0;
+            return -5;
+        }
+        decoder->staged_size = 0;
+        // Fall through to parse the new input below.
+    }
+
+    if (!data || size == 0) return -1;
+
     if (size > MAX_PACKET_SIZE) {
         return -5;
     }
-    
+
     memcpy(decoder->packet_buffer, data, size);
     decoder->packet_buffer_size = size;
-    
+
     return parse_packet(decoder, decoder->packet_buffer, decoder->packet_buffer_size, pts);
 }
 
@@ -375,6 +404,10 @@ int spatial_decoder_flush(spatial_decoder_t* decoder) {
     if (!decoder) return -1;
     avcodec_flush_buffers(decoder->codec_ctx);
     decoder->frame_ready = 0;
+    // A flush establishes a fresh sync point: pre-flush bytes must never
+    // be decoded afterwards, so drop any staged unsent packet as well.
+    decoder->staged_size = 0;
+    decoder->staged_pts = 0;
     return 0;
 }
 

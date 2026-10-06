@@ -1,0 +1,17 @@
+/* OMX adapter version script.
+ *
+ * Exports EXACTLY the two factory symbols of the reference
+ * libstagefright_soft_ac3dec.so (verified via llvm-nm -D):
+ *   _Z22createSoftOMXComponentPKcPK16OMX_CALLBACKTYPEPvPP17OMX_COMPONENTTYPE
+ *     global C++ function used by SoftOMXPlugin via dlsym(mangled name).
+ *   _ZN7android25createSoftAc3OmxComponentEPKcPK16OMX_CALLBACKTYPEPvPP17OMX_COMPONENTTYPE
+ *     android:: namespaced factory.
+ * Everything else is hidden (the adapter links its helpers statically).
+ */
+{
+global:
+    _Z22createSoftOMXComponentPKcPK16OMX_CALLBACKTYPEPvPP17OMX_COMPONENTTYPE;
+    _ZN7android25createSoftAc3OmxComponentEPKcPK16OMX_CALLBACKTYPEPvPP17OMX_COMPONENTTYPE;
+local:
+    *;
+};
