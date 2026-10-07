@@ -107,7 +107,26 @@ private:
         kMtkIndexAc3 = 0x07FB0004,
         kMtkIndexDts = 0x07FB0007,
         kMtkIndexTrueHd = 0x07FB0008,
+        // Device-observed DTS/TrueHD audio descriptor index (ACodec
+        // setupDTSDecoder/setupTrueHDDecoder query it with a 20-byte
+        // {nSize, nVersion, nPortIndex, nChannels, nSampleRate} struct).
+        // Lives past OMX_IndexExtAudioEndUnused of our 1.1-era headers;
+        // the device (IL 1.2-era headers) defines it there.
+        kIdxAndroidDts = 0x6F400009,
+        // Stock role-table (shared MTK soft binary, all four names) input
+        // codings per role: DTS reports 0x6F100003, TrueHD reports
+        // 0x6F100001 (= OMX_AUDIO_CodingAndroidAC3, consistent with the
+        // audio_decoder.ac3p role alias). Our 1.1-era headers define no
+        // DTS/TrueHD codings, so the DTS value is literal.
+        kCodingDts = 0x6F100003,
     };
+
+    // ---- Spatial identity cookie (fixed at construction) ----
+    // Magic 0x53504154 ("SPAT") as the FIRST subclass member (offset =
+    // sizeof(SimpleSoftOMXComponent)). The framework destroy-cave uses it
+    // to recognize OUR components (their plugin instance is heap-private
+    // and invisible to OMXMaster's tables). Never modified after init.
+    uint32_t mSpatialCookie;
 
     // ---- Codec identity (fixed at construction) ----
     spatial_codec_t mCodec;
@@ -167,6 +186,12 @@ private:
     // ---- Input descriptor state (echoed by GetParameter) ----
     OMX_U32 mInputChannels;  // default 6
     OMX_U32 mInputSampleRate;  // default 48000
+
+    // ---- Output PCM echo state (stored on Set, echoed on Get) ----
+    // ACodec SETs the output PCM descriptor from its own format and may
+    // GET it back to verify; stock components echo stored values.
+    OMX_U32 mOutChannels;  // default 2 (stereo downmix)
+    OMX_U32 mOutSampleRate;  // default 48000
 
     // ---- Downmix config cache (change-triggered logging) ----
     spatial_downmix_config_t mAppliedDownmix;

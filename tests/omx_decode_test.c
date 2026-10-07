@@ -29,6 +29,16 @@
 #include <OMX_Index.h>
 #include <OMX_Audio.h>
 
+#include <stdbool.h>
+#include <aaudio/AAudio.h>
+
+// RENDER_AAUDIO=1 (Case F only): real-time AudioTrack render of output
+// PCM via AAudio (S16 stereo 48 kHz = native adapter output format,
+// zero conversion). Additive: validated feed/decode paths untouched.
+// A render thread drains a 4 MB ring (holds the whole validation
+// output; callbacks never block). Verdict additionally requires
+// xruns==0, no ring drops, framesWritten==outFrames.
+
 #define FACTORY_MANGLED \
     "_Z22createSoftOMXComponentPKcPK16OMX_CALLBACKTYPEPvPP17OMX_COMPONENTTYPE"
 
@@ -94,6 +104,60 @@ typedef struct {
     OMX_BUFFERHEADERTYPE *probeHdr;
     int probeDone;
 } Ctx;
+
+#define RING_CAP (4 * 1024 * 1024)
+static uint8_t *g_ring = NULL;
+static size_t g_ringW = 0;
+static size_t g_ringUsed = 0;
+static pthread_mutex_t g_ringLock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t g_ringCond = PTHREAD_COND_INITIALIZER;
+static size_t g_ringDrops = 0;
+static int g_renderActive = 0;
+static int g_renderStop = 0;
+static pthread_t g_renderThread;
+static AAudioStream *g_stream = NULL;
+static int64_t g_renderWritten = 0;
+static int32_t g_renderXruns = -1;
+static int g_renderRan = 0;
+static int g_drainOk = 0;
+
+static void *render_thread(void *arg) {
+    (void)arg;
+    static uint8_t tmp[8192];
+    for (;;) {
+        pthread_mutex_lock(&g_ringLock);
+        while (g_ringUsed == 0 && !g_renderStop) {
+            pthread_cond_wait(&g_ringCond, &g_ringLock);
+        }
+        size_t n = g_ringUsed > sizeof(tmp) ? sizeof(tmp) : g_ringUsed;
+        size_t r = (g_ringW + RING_CAP - g_ringUsed) % RING_CAP;
+        if (n > RING_CAP - r) {
+            n = RING_CAP - r;
+        }
+        memcpy(tmp, g_ring + r, n);
+        g_ringUsed -= n;
+        int stop = g_renderStop && (g_ringUsed == 0);
+        pthread_mutex_unlock(&g_ringLock);
+        size_t done = 0;
+        while (done < n) {
+            int64_t framesLeft = (n - done) / 4;
+            if (framesLeft <= 0) {
+                break;
+            }
+            aaudio_result_t wr = AAudioStream_write(
+                    g_stream, tmp + done, (int32_t)framesLeft, 1000000000);
+            if (wr <= 0) {
+                break;
+            }
+            done += (size_t)wr * 4;
+            g_renderWritten += wr;
+        }
+        if (stop && done >= n) {
+            break;
+        }
+    }
+    return NULL;
+}
 
 static long long now_ms(void) {
     struct timeval tv;
@@ -192,6 +256,32 @@ static OMX_ERRORTYPE onFill(OMX_HANDLETYPE h, OMX_PTR app,
         }
         c->outBytes += b->nFilledLen;
         c->outFrames += b->nFilledLen / 4;
+        if (g_renderActive && g_stream != NULL && c->fillDone == 1) {
+            // Diagnostic: xrun count at first delivered fill (startup
+            // priming vs mid/tail starvation).
+            int32_t xr0 = AAudioStream_getXRunCount(g_stream);
+            printf("RENDER firstFill xruns=%d\n", (int)xr0);
+        }
+        if (g_renderActive && g_ring != NULL) {
+            // Render copy (never blocks the callback thread; drops
+            // counted and fail the verdict).
+            pthread_mutex_lock(&g_ringLock);
+            size_t avail = RING_CAP - g_ringUsed;
+            size_t n = b->nFilledLen < avail ? b->nFilledLen : avail;
+            size_t w = g_ringW;
+            size_t first = n < RING_CAP - w ? n : RING_CAP - w;
+            memcpy(g_ring + w, b->pBuffer + b->nOffset, first);
+            if (n > first) {
+                memcpy(g_ring, b->pBuffer + b->nOffset + first, n - first);
+            }
+            g_ringW = (g_ringW + n) % RING_CAP;
+            g_ringUsed += n;
+            if (n < b->nFilledLen) {
+                g_ringDrops++;
+            }
+            pthread_cond_signal(&g_ringCond);
+            pthread_mutex_unlock(&g_ringLock);
+        }
     }
     if (c->fillDone == 1) {
         c->firstTs = (long long)b->nTimeStamp;
@@ -213,6 +303,10 @@ static OMX_ERRORTYPE onFill(OMX_HANDLETYPE h, OMX_PTR app,
     }
     int eos = (b->nFlags & OMX_BUFFERFLAG_EOS) != 0;
     if (eos) {
+        if (!c->outEos && g_renderActive && g_stream != NULL) {
+            int32_t xr1 = AAudioStream_getXRunCount(g_stream);
+            printf("RENDER eosFill xruns=%d\n", (int)xr1);
+        }
         c->outEos = 1;
     } else if (c->nPendingRefill < MAXBUFS && !getenv("FREE_AFTER_FILL")) {
         // Deferred: main thread re-submits outside the callback.
@@ -856,6 +950,39 @@ int main(int argc, char **argv) {
     size_t got = fread(chunk, 1, IN_CHUNK, fin);
     printf("[op] read %zu input bytes\n", got);
 
+    // RENDER_AAUDIO=1 (Case F only): start real-time render before any
+    // fill can arrive.
+    if (getenv("RENDER_AAUDIO") && kase == 'F') {
+        g_ring = (uint8_t *)malloc(RING_CAP);
+        if (!g_ring) {
+            printf("RENDER FAIL nomem\n");
+            _exit(1);
+        }
+        AAudioStreamBuilder *bld = NULL;
+        AAudio_createStreamBuilder(&bld);
+        AAudioStreamBuilder_setDirection(bld, AAUDIO_DIRECTION_OUTPUT);
+        AAudioStreamBuilder_setFormat(bld, AAUDIO_FORMAT_PCM_I16);
+        AAudioStreamBuilder_setChannelCount(bld, 2);
+        AAudioStreamBuilder_setSampleRate(bld, 48000);
+        AAudioStreamBuilder_setPerformanceMode(
+                bld, AAUDIO_PERFORMANCE_MODE_NONE);
+        aaudio_result_t rr =
+                AAudioStreamBuilder_openStream(bld, &g_stream);
+        AAudioStreamBuilder_delete(bld);
+        if (rr != AAUDIO_OK || g_stream == NULL) {
+            printf("RENDER FAIL open %d\n", (int)rr);
+            _exit(1);
+        }
+        rr = AAudioStream_requestStart(g_stream);
+        if (rr != AAUDIO_OK) {
+            printf("RENDER FAIL start %d\n", (int)rr);
+            _exit(1);
+        }
+        g_renderActive = 1;
+        pthread_create(&g_renderThread, NULL, render_thread, NULL);
+        printf("[op] RENDER_AAUDIO active\n");
+    }
+
     // PERBUF_REUSE=1: seed the input free-list with the first
     // IN_BUF_COUNT (default 4) allocated buffers; only those cycle.
     // (IN_BUF_COUNT + 4096B chunks replays the extractor's 313x4096B
@@ -1089,6 +1216,47 @@ int main(int argc, char **argv) {
     }
     usleep(300000);
     dump_obj("case-F-end", ctx.comp);
+    if (g_renderActive) {
+        // Drain: render runs in real time; wait for the ring to empty
+        // after EOS, then stop the thread and evaluate.
+        long long dt0 = now_ms();
+        int drainOk = 0;
+        for (;;) {
+            int eos;
+            size_t u;
+            pthread_mutex_lock(&ctx.lock);
+            eos = ctx.outEos;
+            pthread_mutex_unlock(&ctx.lock);
+            pthread_mutex_lock(&g_ringLock);
+            u = g_ringUsed;
+            pthread_mutex_unlock(&g_ringLock);
+            if (u == 0 && eos) {
+                drainOk = 1;
+                break;
+            }
+            if (now_ms() - dt0 > 30000) {
+                break;
+            }
+            usleep(50000);
+        }
+        pthread_mutex_lock(&g_ringLock);
+        g_renderStop = 1;
+        pthread_cond_signal(&g_ringCond);
+        pthread_mutex_unlock(&g_ringLock);
+        pthread_join(g_renderThread, NULL);
+        g_renderXruns = AAudioStream_getXRunCount(g_stream);
+        AAudioStream_requestStop(g_stream);
+        AAudioStream_close(g_stream);
+        g_renderActive = 0;
+        g_renderRan = 1;
+        printf("RENDER drainOk=%d written=%lld xruns=%d drops=%zu\n",
+                drainOk, (long long)g_renderWritten,
+                (int)g_renderXruns, g_ringDrops);
+        g_drainOk = drainOk;
+        if (!drainOk) {
+            printf("FAIL: render drain timeout\n");
+        }
+    }
     print_evidence(&ctx, sentBufs);
     int rc = 0;
     if (ctx.emptyDone != sentBufs) {
@@ -1103,6 +1271,25 @@ int main(int argc, char **argv) {
     if (ctx.tsWentBackwards != 0) {
         printf("FAIL: timestamps backwards %d times\n", ctx.tsWentBackwards);
         rc = 1;
+    }
+    if (g_renderRan) {
+        if (!g_drainOk) {
+            printf("FAIL: render drain timeout\n");
+            rc = 1;
+        }
+        if (g_renderXruns != 0) {
+            printf("FAIL: render xruns %d\n", (int)g_renderXruns);
+            rc = 1;
+        }
+        if (g_ringDrops != 0) {
+            printf("FAIL: render ring drops %zu\n", g_ringDrops);
+            rc = 1;
+        }
+        if (g_renderWritten != (int64_t)ctx.outFrames) {
+            printf("FAIL: rendered %lld != outFrames %zu\n",
+                    (long long)g_renderWritten, ctx.outFrames);
+            rc = 1;
+        }
     }
     if (rc == 0) {
         printf("CASE F PASS\n");

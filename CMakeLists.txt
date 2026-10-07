@@ -149,7 +149,10 @@ if(BUILD_OMX_ADAPTER AND ANDROID_BUILD AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/s
 
     # NOTE: no libavformat (reference NEEDED has avcodec/avutil/swresample
     # only; VERIFIED unused); no spatial_all (would duplicate the static
-    # spatial_* objects).
+    # spatial_* objects); no libandroid (UNUSED baggage: no AMedia*/ALooper
+    # C-API refs in adapters; libandroid.so is NOT loadable in the vendor
+    # media.codec linker namespace, so its DT_NEEDED breaks service-side
+    # dlopen (0x80001003). --as-needed below drops any other unused NEEDED.
     set(OMX_ADAPTER_LINK_LIBS
         spatial_decoder
         spatial_pcm
@@ -158,16 +161,17 @@ if(BUILD_OMX_ADAPTER AND ANDROID_BUILD AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/s
         ${OMX_SYSROOT_LIBS}
         ${FFMPEG_CORE_LIBRARIES}
         log
-        android
         dl
         m
         c
     )
 
-    # Build four separate libraries with different output names.
-    # OUTPUT_NAME + default "lib" PREFIX yields libstagefright_soft_*.so,
-    # matching the filenames SoftOMXPlugin dlopens. SONAME defaults to the
-    # file name, matching the reference SONAME.
+    # Build four separate libraries with s_ output names. OUTPUT_NAME +
+    # default "lib" PREFIX yields libstagefright_soft_s_*.so, matching both
+    # the filenames SoftOMXPlugin dlopens AND the DT_SONAME (Bionic dedups
+    # dlopen by SONAME: an ac3dec-style SONAME would collide with the stock
+    # vndk-28 libs already loaded in media.codec and return the WRONG
+    # handle). Unique s_* SONAMEs force a fresh load of our files.
     function(add_omx_adapter name output_name codec_name)
         add_library(${name} SHARED ${OMX_ADAPTER_SOURCES})
         target_include_directories(${name} PRIVATE ${OMX_ADAPTER_INCLUDES})
@@ -182,14 +186,14 @@ if(BUILD_OMX_ADAPTER AND ANDROID_BUILD AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/s
             POSITION_INDEPENDENT_CODE ON
             CXX_VISIBILITY_PRESET hidden
             VISIBILITY_INLINES_HIDDEN ON
-            LINK_FLAGS "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/src/omx/omx_adapter.version"
+            LINK_FLAGS "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/src/omx/omx_adapter.version -Wl,--as-needed"
         )
     endfunction()
 
-    add_omx_adapter(stagefright_soft_ac3dec stagefright_soft_ac3dec ac3dec)
-    add_omx_adapter(stagefright_soft_eac3dec stagefright_soft_eac3dec eac3dec)
-    add_omx_adapter(stagefright_soft_dtsdec stagefright_soft_dtsdec dtsdec)
-    add_omx_adapter(stagefright_soft_truehddec stagefright_soft_truehddec truehddec)
+    add_omx_adapter(spatial_soft_ac3 stagefright_soft_s_ac3 ac3dec)
+    add_omx_adapter(spatial_soft_eac3 stagefright_soft_s_eac3 eac3dec)
+    add_omx_adapter(spatial_soft_dts stagefright_soft_s_dts dtsdec)
+    add_omx_adapter(spatial_soft_thd stagefright_soft_s_thd truehddec)
 endif()
 
 if(BUILD_TESTS)
@@ -215,11 +219,24 @@ if(BUILD_TESTS)
         add_executable(omx_decode_test tests/omx_decode_test.c)
         target_include_directories(omx_decode_test PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/src/omx/aosp_include)
-        target_link_libraries(omx_decode_test PRIVATE dl log)
+        target_link_libraries(omx_decode_test PRIVATE dl log aaudio)
         # Device-side production-feed probe: NDK AMediaExtractor dump of
         # what stagefright yields per sample (sizes, alignment).
         add_executable(extractor_probe tests/extractor_probe.cpp)
         target_link_libraries(extractor_probe PRIVATE mediandk log)
+        # Device-side OMX name-resolution probe: app-level (AMediaCodec)
+        # + plugin-level (SoftOMXPlugin exact OMX_ERRORTYPE).
+        add_executable(omx_probe tests/omx_probe.cpp)
+        target_include_directories(omx_probe PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/omx/aosp_include)
+        target_link_libraries(omx_probe PRIVATE mediandk log dl aaudio)
+        # Device-side BL/LR bit0 probe (diagnostic for PIC cave work).
+        add_executable(lr_probe tests/lr_probe.c)
+        target_link_libraries(lr_probe PRIVATE log)
+        # Device-side mapping scanner: finds patched cave/data bytes at
+        # runtime with zero address-frame assumptions (/proc/self/maps).
+        add_executable(mapscan tests/mapscan.cpp)
+        target_link_libraries(mapscan PRIVATE log dl)
     endif()
 
     add_test(NAME decoder_test COMMAND test_decoder)
