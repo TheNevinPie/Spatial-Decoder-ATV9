@@ -1,9 +1,9 @@
 // mapscan.cpp — find our patched bytes in THIS process's memory.
 // dlopens the plugin lib, then scans /proc/self/maps for the lib path and
 // memmem-searches each readable mapping for three known-plaintext patterns:
-//   TABLE  10B: 63 34 61 3B 74 43 72 4A FF 00
-//   PREFIX  8B: "OMX.test"
-//   CAVE   first 8B: 00 F0 00 F8 49 F2 36 00 (bl; movw #36918)
+//   TABLE  10B: 61 0A 65 10 64 17 74 1D FF 00
+//   PREFIX 12B: "OMX.spatial."
+//   CAVE   first 8B: 74 46 44 F2 BB 70 C0 F2 (mov r4,lr; movw r0,#0x47BB)
 // Prints runtime addr, mapping perms/fileoff, and addr-minus-dlbase deltas.
 #include <dlfcn.h>
 #include <stdint.h>
@@ -12,13 +12,13 @@
 #include <string.h>
 
 static const unsigned char kTable[10] = {
-    0x63, 0x34, 0x61, 0x3B, 0x74, 0x43, 0x72, 0x4A, 0xFF, 0x00,
+    0x61, 0x0A, 0x65, 0x10, 0x64, 0x17, 0x74, 0x1D, 0xFF, 0x00,
 };
-static const unsigned char kPrefix[8] = {
-    'O', 'M', 'X', '.', 't', 'e', 's', 't',
+static const unsigned char kPrefix[12] = {
+    'O', 'M', 'X', '.', 's', 'p', 'a', 't', 'i', 'a', 'l', '.',
 };
 static const unsigned char kCave[8] = {
-    0x74, 0x46, 0x44, 0xF2, 0xA9, 0x20, 0xC0, 0xF2,
+    0x74, 0x46, 0x44, 0xF2, 0xBB, 0x70, 0xC0, 0xF2,
 };
 static const unsigned char kCtl[] = "OMX.google.mp3.decoder";
 
