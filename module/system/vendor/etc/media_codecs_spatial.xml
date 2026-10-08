@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Spatial OMX production-selection codecs (systemless module spatial_omx_test).
+     Included FIRST in media_codecs.xml so normal bytype selection for
+     audio/ac3, audio/eac3, audio/vnd.dts and audio/true-hd resolves to
+     OMX.test.spatial.* (RC1 route-cave instantiation, stereo S16 48kHz
+     downmix). No OMX.google.* entry is modified or removed; the stock
+     software decoders remain listed after ours as automatic fallback. -->
+<Included>
+    <Decoders>
+        <MediaCodec name="OMX.test.spatial.ac3" type="audio/ac3">
+            <Limit name="channel-count" max="6" />
+            <Limit name="sample-rate" ranges="32000,44100,48000" />
+        </MediaCodec>
+        <MediaCodec name="OMX.test.spatial.eac3" type="audio/eac3">
+            <Limit name="channel-count" max="8" />
+            <Limit name="sample-rate" ranges="32000,44100,48000" />
+        </MediaCodec>
+        <MediaCodec name="OMX.test.spatial.dts" type="audio/vnd.dts">
+            <Limit name="channel-count" max="6" />
+            <Limit name="sample-rate" ranges="32000,44100,48000" />
+        </MediaCodec>
+        <MediaCodec name="OMX.test.spatial.truehd" type="audio/true-hd">
+            <Limit name="channel-count" max="8" />
+            <Limit name="sample-rate" ranges="44100,48000" />
+        </MediaCodec>
+    </Decoders>
+</Included>
