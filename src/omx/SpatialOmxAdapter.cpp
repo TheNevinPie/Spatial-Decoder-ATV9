@@ -513,8 +513,14 @@ OMX_ERRORTYPE SpatialOmxAdapter::internalGetParameter(
             // Word offsets: [3] nChannels, [4] eNumData, [5] eEndian,
             // [6] bInterleaved, [7] nBitPerSample, [8] nSamplingRate,
             // [9] ePCMMode, [10+i] eChannelMapping[i].
+            // Output port (w2==1) always reports the fixed stereo 48kHz
+            // downmix layout regardless of stored echo (see SetParameter).
+            const OMX_U32 repCh = (w2 == 1) ?
+                    (OMX_U32)kOutChannels : mOutChannels;
+            const OMX_U32 repRate = (w2 == 1) ?
+                    (OMX_U32)kOutSampleRate : mOutSampleRate;
             if (callerSize >= 16) {
-                w[3] = mOutChannels;
+                w[3] = repCh;
             }
             if (callerSize >= 20) {
                 w[4] = (OMX_U32)OMX_NumericalDataSigned;
@@ -529,7 +535,7 @@ OMX_ERRORTYPE SpatialOmxAdapter::internalGetParameter(
                 w[7] = 16;
             }
             if (callerSize >= 36) {
-                w[8] = mOutSampleRate;
+                w[8] = repRate;
             }
             if (callerSize >= 40) {
                 w[9] = (OMX_U32)OMX_AUDIO_PCMModeLinear;
@@ -772,14 +778,21 @@ OMX_ERRORTYPE SpatialOmxAdapter::internalSetParameter(
                 res = OMX_ErrorBadParameter;
                 break;
             }
-            // Store the framework's echo (stock behavior); our fixed
-            // stereo output is reported back on Get.
+            // The output port (w2==1) is fixed stereo 48kHz downmix: never
+            // adopt the framework's channel echo or Get will advertise the
+            // input layout (e.g. 6ch) and sinks play ~3x fast. The echo is
+            // stored only for input-port (w2==0) bookkeeping.
             const OMX_U32 *w = (const OMX_U32 *)params;
-            if (callerSize >= 16 && w[3] >= 1 && w[3] <= kMaxChannels) {
-                mOutChannels = w[3];
-            }
-            if (callerSize >= 36 && w[8] >= 8000 && w[8] <= 192000) {
-                mOutSampleRate = w[8];
+            if (w2 == 1) {
+                mOutChannels = (OMX_U32)kOutChannels;
+                mOutSampleRate = (OMX_U32)kOutSampleRate;
+            } else {
+                if (callerSize >= 16 && w[3] >= 1 && w[3] <= kMaxChannels) {
+                    mOutChannels = w[3];
+                }
+                if (callerSize >= 36 && w[8] >= 8000 && w[8] <= 192000) {
+                    mOutSampleRate = w[8];
+                }
             }
             res = OMX_ErrorNone;
             break;
