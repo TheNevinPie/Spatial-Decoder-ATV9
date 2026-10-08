@@ -513,8 +513,14 @@ OMX_ERRORTYPE SpatialOmxAdapter::internalGetParameter(
             // Word offsets: [3] nChannels, [4] eNumData, [5] eEndian,
             // [6] bInterleaved, [7] nBitPerSample, [8] nSamplingRate,
             // [9] ePCMMode, [10+i] eChannelMapping[i].
+            // Output port (w2==1) always reports the fixed stereo 48kHz
+            // downmix layout regardless of stored echo (see SetParameter).
+            const OMX_U32 repCh = (w2 == 1) ?
+                    (OMX_U32)kOutChannels : mOutChannels;
+            const OMX_U32 repRate = (w2 == 1) ?
+                    (OMX_U32)kOutSampleRate : mOutSampleRate;
             if (callerSize >= 16) {
-                w[3] = mOutChannels;
+                w[3] = repCh;
             }
             if (callerSize >= 20) {
                 w[4] = (OMX_U32)OMX_NumericalDataSigned;
@@ -529,7 +535,7 @@ OMX_ERRORTYPE SpatialOmxAdapter::internalGetParameter(
                 w[7] = 16;
             }
             if (callerSize >= 36) {
-                w[8] = mOutSampleRate;
+                w[8] = repRate;
             }
             if (callerSize >= 40) {
                 w[9] = (OMX_U32)OMX_AUDIO_PCMModeLinear;
@@ -772,14 +778,21 @@ OMX_ERRORTYPE SpatialOmxAdapter::internalSetParameter(
                 res = OMX_ErrorBadParameter;
                 break;
             }
-            // Store the framework's echo (stock behavior); our fixed
-            // stereo output is reported back on Get.
+            // The output port (w2==1) is fixed stereo 48kHz downmix: never
+            // adopt the framework's channel echo or Get will advertise the
+            // input layout (e.g. 6ch) and sinks play ~3x fast. The echo is
+            // stored only for input-port (w2==0) bookkeeping.
             const OMX_U32 *w = (const OMX_U32 *)params;
-            if (callerSize >= 16 && w[3] >= 1 && w[3] <= kMaxChannels) {
-                mOutChannels = w[3];
-            }
-            if (callerSize >= 36 && w[8] >= 8000 && w[8] <= 192000) {
-                mOutSampleRate = w[8];
+            if (w2 == 1) {
+                mOutChannels = (OMX_U32)kOutChannels;
+                mOutSampleRate = (OMX_U32)kOutSampleRate;
+            } else {
+                if (callerSize >= 16 && w[3] >= 1 && w[3] <= kMaxChannels) {
+                    mOutChannels = w[3];
+                }
+                if (callerSize >= 36 && w[8] >= 8000 && w[8] <= 192000) {
+                    mOutSampleRate = w[8];
+                }
             }
             res = OMX_ErrorNone;
             break;
@@ -982,6 +995,19 @@ void SpatialOmxAdapter::decodeAvailableFrames() {
 void SpatialOmxAdapter::drainDecoderFrames() {
     spatial_frame_t frame;
     for (;;) {
+        // Backpressure: never pull a decoded frame the stage cannot hold.
+        // Worst case single frame is kMaxFrameSamples output frames (the
+        // converter caps output there and spatial_pcm rejects larger
+        // input frames). Unpulled frames wait in the decoder and drain on
+        // later queue events once drainStageToOutput frees room; pulling
+        // without room would hit the stage-overflow drop and punch a
+        // content hole in an otherwise continuous PTS timeline (A/V
+        // desync under burst input). Addition form: no underflow even if
+        // the invariant ever broke.
+        if (mStageValid + (size_t)kMaxFrameSamples
+                > (size_t)kStageFrames) {
+            break;
+        }
         memset(&frame, 0, sizeof(frame));
         int ret = spatial_decoder_receive_frame(mDecoder, &frame);
         if (ret == SPATIAL_DECODER_AGAIN) {
@@ -1309,14 +1335,17 @@ void SpatialOmxAdapter::refreshConfigIfNeeded(bool force) {
     dm.gains_5_1.left = cfg.gains_5_1[0];
     dm.gains_5_1.right = cfg.gains_5_1[1];
     dm.gains_5_1.center = cfg.gains_5_1[2];
-    dm.gains_5_1.surround = cfg.gains_5_1[3];
-    dm.gains_5_1.lfe = cfg.gains_5_1[4];
+    dm.gains_5_1.surround_left = cfg.gains_5_1[3];
+    dm.gains_5_1.surround_right = cfg.gains_5_1[4];
+    dm.gains_5_1.lfe = cfg.gains_5_1[5];
     dm.gains_7_1.left = cfg.gains_7_1[0];
     dm.gains_7_1.right = cfg.gains_7_1[1];
     dm.gains_7_1.center = cfg.gains_7_1[2];
-    dm.gains_7_1.side = cfg.gains_7_1[3];
-    dm.gains_7_1.rear = cfg.gains_7_1[4];
-    dm.gains_7_1.lfe = cfg.gains_7_1[5];
+    dm.gains_7_1.side_left = cfg.gains_7_1[3];
+    dm.gains_7_1.side_right = cfg.gains_7_1[4];
+    dm.gains_7_1.rear_left = cfg.gains_7_1[5];
+    dm.gains_7_1.rear_right = cfg.gains_7_1[6];
+    dm.gains_7_1.lfe = cfg.gains_7_1[7];
     dm.matrix_oba = cfg.matrix_oba;
     dm.matrix_cba = cfg.matrix_cba;
     dm.content_type = cfg.content_type;
@@ -1330,15 +1359,16 @@ void SpatialOmxAdapter::refreshConfigIfNeeded(bool force) {
         mHaveAppliedDownmix = true;
         if (mDebug) {
             if (dm.layout == SPATIAL_LAYOUT_5_1) {
-                ALOGI("downmix 5.1: L=%.3f R=%.3f C=%.3f S=%.3f LFE=%.3f",
+                ALOGI("downmix 5.1: L=%.3f R=%.3f C=%.3f SL=%.3f SR=%.3f LFE=%.3f",
                         dm.gains_5_1.left, dm.gains_5_1.right,
-                        dm.gains_5_1.center, dm.gains_5_1.surround,
-                        dm.gains_5_1.lfe);
+                        dm.gains_5_1.center, dm.gains_5_1.surround_left,
+                        dm.gains_5_1.surround_right, dm.gains_5_1.lfe);
             } else {
-                ALOGI("downmix 7.1: L=%.3f R=%.3f C=%.3f Sd=%.3f Rr=%.3f LFE=%.3f",
+                ALOGI("downmix 7.1: L=%.3f R=%.3f C=%.3f SL=%.3f SR=%.3f BL=%.3f BR=%.3f LFE=%.3f",
                         dm.gains_7_1.left, dm.gains_7_1.right,
-                        dm.gains_7_1.center, dm.gains_7_1.side,
-                        dm.gains_7_1.rear, dm.gains_7_1.lfe);
+                        dm.gains_7_1.center, dm.gains_7_1.side_left,
+                        dm.gains_7_1.side_right, dm.gains_7_1.rear_left,
+                        dm.gains_7_1.rear_right, dm.gains_7_1.lfe);
             }
         }
     }

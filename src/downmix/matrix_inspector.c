@@ -56,13 +56,14 @@ static spatial_config_t build_config_from_args(int argc, char** argv) {
             config.gains_5_1[3] = atof(argv[++i]);
             config.gains_5_1[4] = config.gains_5_1[3];
         } else if (strcmp(argv[i], "--lfe") == 0 && i + 1 < argc) {
-            config.gains_5_1[4] = atof(argv[++i]);
-            config.gains_7_1[5] = config.gains_5_1[4];
+            config.gains_5_1[5] = atof(argv[++i]);
+            config.gains_7_1[7] = config.gains_5_1[5];
         } else if (strcmp(argv[i], "--side") == 0 && i + 1 < argc) {
             config.gains_7_1[3] = atof(argv[++i]);
             config.gains_7_1[4] = config.gains_7_1[3];
         } else if (strcmp(argv[i], "--rear") == 0 && i + 1 < argc) {
-            config.gains_7_1[4] = atof(argv[++i]);
+            config.gains_7_1[5] = atof(argv[++i]);
+            config.gains_7_1[6] = config.gains_7_1[5];
         }
     }
     return config;

@@ -1,6 +1,6 @@
 // omx_probe.cpp — component-name resolution boundary probe (device-side).
 //
-// Exercises the REAL lookup paths for each OMX.test.spatial.* name:
+// Exercises the REAL lookup paths for each OMX.spatial.* name:
 //   (A) app level: AMediaCodec_createByCodecName (full MediaCodecList +
 //       OMX service routing, same as any player).
 //   (B) app level: AMediaCodec_createDecoderByType for the four MIME
@@ -80,10 +80,10 @@ int main(void) {
     printf("PROBE pid=%d\n", (int)getpid());
 
     static const char *kTestNames[4] = {
-        "OMX.test.spatial.ac3",
-        "OMX.test.spatial.eac3",
-        "OMX.test.spatial.dts",
-        "OMX.test.spatial.truehd",
+        "OMX.spatial.ac3",
+        "OMX.spatial.eac3",
+        "OMX.spatial.dts",
+        "OMX.spatial.truehd",
     };
     static const char *kMimes[4] = {
         "audio/ac3", "audio/eac3", "audio/vnd.dts", "audio/true-hd",
@@ -626,12 +626,12 @@ int main(void) {
                     (unsigned long)(uintptr_t)mi.dli_saddr,
                     (unsigned long)base);
             volatile const unsigned char *tab =
-                    (const unsigned char *)(base + 0x40B4A);
+                    (const unsigned char *)(base + 0x40B5C);
             volatile const unsigned char *pre =
-                    (const unsigned char *)(base + 0x40B42);
-            char pfx[9];
-            memcpy(pfx, (const void *)pre, 8);
-            pfx[8] = 0;
+                    (const unsigned char *)(base + 0x40B50);
+            char pfx[13];
+            memcpy(pfx, (const void *)pre, 12);
+            pfx[12] = 0;
             printf("PROBE addrmap base=0x%08lx table=%p prefix='%s'\n",
                     (unsigned long)base, (const void *)tab, pfx);
             for (int k = 0; k < 5; k++) {
@@ -642,7 +642,7 @@ int main(void) {
                 // GOT slot for strncmp (link-time 0x48B00): what does the
                 // PLT stub actually jump through at runtime? Guarded by
                 // the prefix check above -- never touch wild addresses.
-                if (memcmp(pfx, "OMX.test", 8) == 0) {
+                if (memcmp(pfx, "OMX.spatial.", 12) == 0) {
                     uintptr_t got = 0;
                     memcpy(&got, (const void *)(base + 0x48B00), 4);
                     printf("PROBE addrmap strncmp-got=0x%08lx\n",
@@ -783,7 +783,7 @@ int main(void) {
         // Ac3-struct, Pcm) and print EVERY result. Definitive verdict on
         // component-side acceptance (no logd/chatty dependence).
         OMX_COMPONENTTYPE *comp = NULL;
-        int32_t err = make(plug, "OMX.test.spatial.ac3", &cb, NULL, &comp);
+        int32_t err = make(plug, "OMX.spatial.ac3", &cb, NULL, &comp);
         printf("PROBE replay make err=0x%08x comp=%p\n",
                 (uint32_t)err, (void *)comp);
         if (err == 0 && comp != NULL) {

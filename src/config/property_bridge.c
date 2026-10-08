@@ -20,12 +20,30 @@
 #define PROP_5_1_SURROUND "persist.vendor.spatialdm.5_1.surround"
 #define PROP_5_1_LFE "persist.vendor.spatialdm.5_1.lfe"
 
+// Fine-grained per-channel overrides (each controls exactly one slot;
+// when set and valid they win over the coarse property above).
+// NOTE: "center" and "lfe" keys are shared with the coarse set above.
+#define PROP_5_1_FRONT_LEFT "persist.vendor.spatialdm.5_1.front_left"
+#define PROP_5_1_FRONT_RIGHT "persist.vendor.spatialdm.5_1.front_right"
+#define PROP_5_1_SURROUND_LEFT "persist.vendor.spatialdm.5_1.surround_left"
+#define PROP_5_1_SURROUND_RIGHT "persist.vendor.spatialdm.5_1.surround_right"
+
 #define PROP_7_1_LEFT "persist.vendor.spatialdm.7_1.left"
 #define PROP_7_1_RIGHT "persist.vendor.spatialdm.7_1.right"
 #define PROP_7_1_CENTER "persist.vendor.spatialdm.7_1.center"
 #define PROP_7_1_SIDE "persist.vendor.spatialdm.7_1.side"
 #define PROP_7_1_REAR "persist.vendor.spatialdm.7_1.rear"
 #define PROP_7_1_LFE "persist.vendor.spatialdm.7_1.lfe"
+
+// Fine-grained per-channel overrides (each controls exactly one slot;
+// when set and valid they win over the coarse property above).
+// NOTE: "center" and "lfe" keys are shared with the coarse set above.
+#define PROP_7_1_FRONT_LEFT "persist.vendor.spatialdm.7_1.front_left"
+#define PROP_7_1_FRONT_RIGHT "persist.vendor.spatialdm.7_1.front_right"
+#define PROP_7_1_SIDE_LEFT "persist.vendor.spatialdm.7_1.side_left"
+#define PROP_7_1_SIDE_RIGHT "persist.vendor.spatialdm.7_1.side_right"
+#define PROP_7_1_REAR_LEFT "persist.vendor.spatialdm.7_1.rear_left"
+#define PROP_7_1_REAR_RIGHT "persist.vendor.spatialdm.7_1.rear_right"
 
 #define PROP_MATRIX_OBA "persist.vendor.spatialdm.matrix_encoding.oba"
 #define PROP_MATRIX_CBA "persist.vendor.spatialdm.matrix_encoding.cba"
@@ -36,15 +54,31 @@ struct spatial_property_ctx {
     bool initialized;
 };
 
-static const char* gain_5_1_names[5] = {
+// Coarse properties write one or two slots (shared pair gains).
+// slots entries: {first, second}; second == -1 means single slot.
+static const char* coarse_5_1_names[5] = {
     PROP_5_1_LEFT,
     PROP_5_1_RIGHT,
     PROP_5_1_CENTER,
     PROP_5_1_SURROUND,
     PROP_5_1_LFE
 };
+static const int coarse_5_1_slots[5][2] = {
+    {0, -1}, {1, -1}, {2, -1}, {3, 4}, {5, -1},
+};
 
-static const char* gain_7_1_names[6] = {
+// Fine properties override exactly one slot each (read after coarse).
+static const char* fine_5_1_names[6] = {
+    PROP_5_1_FRONT_LEFT,
+    PROP_5_1_FRONT_RIGHT,
+    PROP_5_1_CENTER,
+    PROP_5_1_SURROUND_LEFT,
+    PROP_5_1_SURROUND_RIGHT,
+    PROP_5_1_LFE
+};
+static const int fine_5_1_slots[6] = {0, 1, 2, 3, 4, 5};
+
+static const char* coarse_7_1_names[6] = {
     PROP_7_1_LEFT,
     PROP_7_1_RIGHT,
     PROP_7_1_CENTER,
@@ -52,6 +86,21 @@ static const char* gain_7_1_names[6] = {
     PROP_7_1_REAR,
     PROP_7_1_LFE
 };
+static const int coarse_7_1_slots[6][2] = {
+    {0, -1}, {1, -1}, {2, -1}, {3, 4}, {5, 6}, {7, -1},
+};
+
+static const char* fine_7_1_names[8] = {
+    PROP_7_1_FRONT_LEFT,
+    PROP_7_1_FRONT_RIGHT,
+    PROP_7_1_CENTER,
+    PROP_7_1_SIDE_LEFT,
+    PROP_7_1_SIDE_RIGHT,
+    PROP_7_1_REAR_LEFT,
+    PROP_7_1_REAR_RIGHT,
+    PROP_7_1_LFE
+};
+static const int fine_7_1_slots[8] = {0, 1, 2, 3, 4, 5, 6, 7};
 
 static bool read_prop_float(const char* key, float* out_value) {
     char value[MAX_PROP_VALUE];
@@ -146,24 +195,55 @@ int spatial_property_read_all(spatial_property_ctx_t* ctx, spatial_config_t* out
     }
     
     float gain_val;
+    int slot;
+    // Coarse pass: shared pair gains fan out to both siblings.
     for (int i = 0; i < 5; i++) {
-        if (read_prop_float(gain_5_1_names[i], &gain_val)) {
+        if (read_prop_float(coarse_5_1_names[i], &gain_val)) {
             if (spatial_property_validate_gain(gain_val)) {
-                out_config->gains_5_1[i] = gain_val;
+                out_config->gains_5_1[coarse_5_1_slots[i][0]] = gain_val;
+                slot = coarse_5_1_slots[i][1];
+                if (slot >= 0) {
+                    out_config->gains_5_1[slot] = gain_val;
+                }
             } else {
                 ALOGW("Property '%s' validation failed: gain=%.3f (must be >= 0), using default",
-                      gain_5_1_names[i], gain_val);
+                      coarse_5_1_names[i], gain_val);
             }
         }
     }
-    
+    // Fine pass: per-channel overrides win over coarse.
     for (int i = 0; i < 6; i++) {
-        if (read_prop_float(gain_7_1_names[i], &gain_val)) {
+        if (read_prop_float(fine_5_1_names[i], &gain_val)) {
             if (spatial_property_validate_gain(gain_val)) {
-                out_config->gains_7_1[i] = gain_val;
+                out_config->gains_5_1[fine_5_1_slots[i]] = gain_val;
             } else {
                 ALOGW("Property '%s' validation failed: gain=%.3f (must be >= 0), using default",
-                      gain_7_1_names[i], gain_val);
+                      fine_5_1_names[i], gain_val);
+            }
+        }
+    }
+
+    for (int i = 0; i < 6; i++) {
+        if (read_prop_float(coarse_7_1_names[i], &gain_val)) {
+            if (spatial_property_validate_gain(gain_val)) {
+                out_config->gains_7_1[coarse_7_1_slots[i][0]] = gain_val;
+                slot = coarse_7_1_slots[i][1];
+                if (slot >= 0) {
+                    out_config->gains_7_1[slot] = gain_val;
+                }
+            } else {
+                ALOGW("Property '%s' validation failed: gain=%.3f (must be >= 0), using default",
+                      coarse_7_1_names[i], gain_val);
+            }
+        }
+    }
+    for (int i = 0; i < 8; i++) {
+        if (read_prop_float(fine_7_1_names[i], &gain_val)) {
+            if (spatial_property_validate_gain(gain_val)) {
+                out_config->gains_7_1[fine_7_1_slots[i]] = gain_val;
+            } else {
+                ALOGW("Property '%s' validation failed: gain=%.3f (must be >= 0), using default",
+                      fine_7_1_names[i], gain_val);
             }
         }
     }

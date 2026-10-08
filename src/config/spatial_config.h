@@ -33,8 +33,10 @@ typedef struct {
 
 typedef struct {
     spatial_layout_t layout;
-    float gains_5_1[5];
-    float gains_7_1[6];
+    // Per-channel linear gains. 5.1 slots: 0 FL, 1 FR, 2 C, 3 SL, 4 SR,
+    // 5 LFE. 7.1 slots: 0 FL, 1 FR, 2 C, 3 SL, 4 SR, 5 BL, 6 BR, 7 LFE.
+    float gains_5_1[6];
+    float gains_7_1[8];
     spatial_matrix_mode_t matrix_oba;
     spatial_matrix_mode_t matrix_cba;
     spatial_content_type_t content_type;
