@@ -995,6 +995,19 @@ void SpatialOmxAdapter::decodeAvailableFrames() {
 void SpatialOmxAdapter::drainDecoderFrames() {
     spatial_frame_t frame;
     for (;;) {
+        // Backpressure: never pull a decoded frame the stage cannot hold.
+        // Worst case single frame is kMaxFrameSamples output frames (the
+        // converter caps output there and spatial_pcm rejects larger
+        // input frames). Unpulled frames wait in the decoder and drain on
+        // later queue events once drainStageToOutput frees room; pulling
+        // without room would hit the stage-overflow drop and punch a
+        // content hole in an otherwise continuous PTS timeline (A/V
+        // desync under burst input). Addition form: no underflow even if
+        // the invariant ever broke.
+        if (mStageValid + (size_t)kMaxFrameSamples
+                > (size_t)kStageFrames) {
+            break;
+        }
         memset(&frame, 0, sizeof(frame));
         int ret = spatial_decoder_receive_frame(mDecoder, &frame);
         if (ret == SPATIAL_DECODER_AGAIN) {
