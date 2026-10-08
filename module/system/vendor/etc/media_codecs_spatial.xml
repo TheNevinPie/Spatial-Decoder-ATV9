@@ -3,8 +3,9 @@
      Included FIRST in media_codecs.xml so normal bytype selection for
      audio/ac3, audio/eac3, audio/vnd.dts and audio/true-hd resolves to
      OMX.test.spatial.* (RC1 route-cave instantiation, stereo S16 48kHz
-     downmix). No OMX.google.* entry is modified or removed; the stock
-     software decoders remain listed after ours as automatic fallback. -->
+     downmix). TEMP: the four stock OMX.google.* decoders for these MIMEs
+     are commented out in media_codecs.xml (implementations untouched on
+     disk); dtshd/dtse/dtslbr and all other entries stay listed. -->
 <Included>
     <Decoders>
         <MediaCodec name="OMX.test.spatial.ac3" type="audio/ac3">

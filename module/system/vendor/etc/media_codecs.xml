@@ -213,6 +213,10 @@
             <Quirk name="requires-allocate-on-input-ports" />
             <Quirk name="requires-allocate-on-output-ports" />
         </MediaCodec>
+        <!-- TEMP-PROD-SELECTION Begin: stock OMX.google decoders for the four
+             spatial MIMEs are delisted so normal bytype selection resolves
+             to OMX.test.spatial.*. Stock .so implementations remain on disk
+             untouched; dtshd/dtse/dtslbr entries below stay listed.
         <MediaCodec name="OMX.google.ac3.decoder">
             <Type name="audio/ac3">
                 <Limit name="channel-count" max="6" />
@@ -237,6 +241,7 @@
             <Limit name="sample-rate" ranges="8000,16000,32000,44100,48000,88200,96000,176400,192000" />
             <Limit name="bitrate" range="32000-24576000" />
         </MediaCodec>
+        TEMP-PROD-SELECTION End -->
         <MediaCodec name="OMX.google.dtshd.decoder" type="audio/vnd.dts.hd">
             <Limit name="channel-count" max="8" />
             <Limit name="sample-rate" ranges="8000,16000,32000,44100,48000,88200,96000,176400,192000" />
@@ -252,11 +257,13 @@
             <Limit name="sample-rate" ranges="8000,16000,32000,44100,48000,88200,96000,176400,192000" />
             <Limit name="bitrate" range="32000-24576000" />
         </MediaCodec>
+        <!-- TEMP-PROD-SELECTION: stock OMX.google.truehd.decoder delisted, see above.
         <MediaCodec name="OMX.google.truehd.decoder" type="audio/true-hd">
             <Limit name="channel-count" max="8" />
             <Limit name="sample-rate" ranges="44100,48000,96000,192000" />
             <Limit name="bitrate" range="32000-24576000" />
         </MediaCodec>
+        TEMP-PROD-SELECTION End -->
     </Decoders>
     <Include href="media_codecs_google_video_le.xml" />
 </MediaCodecs>
