@@ -204,6 +204,14 @@ if(BUILD_TESTS)
 
     add_executable(test_downmix tests/downmix_test.c)
     target_link_libraries(test_downmix spatial_downmix spatial_config spatial_pcm ${FFMPEG_LIBRARIES})
+    if(NOT ANDROID_BUILD)
+        # Host-only: Android property/log headers backed by environment
+        # variables (tests/host_shim) so property_bridge.c compiles and
+        # runs off-device. Never used in device builds.
+        target_include_directories(spatial_config PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/host_shim)
+        target_sources(test_downmix PRIVATE tests/host_shim/shim.c)
+    endif()
 
     add_executable(matrix_inspector src/downmix/matrix_inspector.c)
     target_link_libraries(matrix_inspector spatial_config spatial_pcm)

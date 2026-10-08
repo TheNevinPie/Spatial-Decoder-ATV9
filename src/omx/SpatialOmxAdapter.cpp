@@ -1335,14 +1335,17 @@ void SpatialOmxAdapter::refreshConfigIfNeeded(bool force) {
     dm.gains_5_1.left = cfg.gains_5_1[0];
     dm.gains_5_1.right = cfg.gains_5_1[1];
     dm.gains_5_1.center = cfg.gains_5_1[2];
-    dm.gains_5_1.surround = cfg.gains_5_1[3];
-    dm.gains_5_1.lfe = cfg.gains_5_1[4];
+    dm.gains_5_1.surround_left = cfg.gains_5_1[3];
+    dm.gains_5_1.surround_right = cfg.gains_5_1[4];
+    dm.gains_5_1.lfe = cfg.gains_5_1[5];
     dm.gains_7_1.left = cfg.gains_7_1[0];
     dm.gains_7_1.right = cfg.gains_7_1[1];
     dm.gains_7_1.center = cfg.gains_7_1[2];
-    dm.gains_7_1.side = cfg.gains_7_1[3];
-    dm.gains_7_1.rear = cfg.gains_7_1[4];
-    dm.gains_7_1.lfe = cfg.gains_7_1[5];
+    dm.gains_7_1.side_left = cfg.gains_7_1[3];
+    dm.gains_7_1.side_right = cfg.gains_7_1[4];
+    dm.gains_7_1.rear_left = cfg.gains_7_1[5];
+    dm.gains_7_1.rear_right = cfg.gains_7_1[6];
+    dm.gains_7_1.lfe = cfg.gains_7_1[7];
     dm.matrix_oba = cfg.matrix_oba;
     dm.matrix_cba = cfg.matrix_cba;
     dm.content_type = cfg.content_type;
@@ -1356,15 +1359,16 @@ void SpatialOmxAdapter::refreshConfigIfNeeded(bool force) {
         mHaveAppliedDownmix = true;
         if (mDebug) {
             if (dm.layout == SPATIAL_LAYOUT_5_1) {
-                ALOGI("downmix 5.1: L=%.3f R=%.3f C=%.3f S=%.3f LFE=%.3f",
+                ALOGI("downmix 5.1: L=%.3f R=%.3f C=%.3f SL=%.3f SR=%.3f LFE=%.3f",
                         dm.gains_5_1.left, dm.gains_5_1.right,
-                        dm.gains_5_1.center, dm.gains_5_1.surround,
-                        dm.gains_5_1.lfe);
+                        dm.gains_5_1.center, dm.gains_5_1.surround_left,
+                        dm.gains_5_1.surround_right, dm.gains_5_1.lfe);
             } else {
-                ALOGI("downmix 7.1: L=%.3f R=%.3f C=%.3f Sd=%.3f Rr=%.3f LFE=%.3f",
+                ALOGI("downmix 7.1: L=%.3f R=%.3f C=%.3f SL=%.3f SR=%.3f BL=%.3f BR=%.3f LFE=%.3f",
                         dm.gains_7_1.left, dm.gains_7_1.right,
-                        dm.gains_7_1.center, dm.gains_7_1.side,
-                        dm.gains_7_1.rear, dm.gains_7_1.lfe);
+                        dm.gains_7_1.center, dm.gains_7_1.side_left,
+                        dm.gains_7_1.side_right, dm.gains_7_1.rear_left,
+                        dm.gains_7_1.rear_right, dm.gains_7_1.lfe);
             }
         }
     }

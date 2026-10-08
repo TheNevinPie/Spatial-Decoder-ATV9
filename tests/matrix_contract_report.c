@@ -61,24 +61,24 @@ static void print_matrix_json(const spatial_matrix_t* matrix, const char* label)
     printf("}\n\n");
 }
 
-static spatial_config_t build_config(spatial_layout_t layout, float gains_5_1[5], float gains_7_1[6]) {
+static spatial_config_t build_config(spatial_layout_t layout, float gains_5_1[6], float gains_7_1[8]) {
     spatial_config_t config;
     spatial_config_get_defaults(&config);
     config.layout = layout;
+
+    for (int i = 0; i < 6; i++) config.gains_5_1[i] = gains_5_1[i];
+    for (int i = 0; i < 8; i++) config.gains_7_1[i] = gains_7_1[i];
     
-    for (int i = 0; i < 5; i++) config.gains_5_1[i] = gains_5_1[i];
-    for (int i = 0; i < 6; i++) config.gains_7_1[i] = gains_7_1[i];
-    
-    config->matrix_oba = 0;
-    config->matrix_cba = 0;
-    config->content_type = 0;
-    config->debug_enabled = false;
-    config->generation = 1;
+    config.matrix_oba = 0;
+    config.matrix_cba = 0;
+    config.content_type = 0;
+    config.debug_enabled = false;
+    config.generation = 1;
     
     return config;
 }
 
-void print_report(const char* label, spatial_layout_t layout, float gains_5_1[5], float gains_7_1[6]) {
+void print_report(const char* label, spatial_layout_t layout, float gains_5_1[6], float gains_7_1[8]) {
     spatial_config_t config = build_config(layout, gains_5_1, gains_7_1);
     spatial_matrix_t matrix;
     spatial_config_build_matrix(&config, &matrix);
@@ -92,36 +92,36 @@ int main() {
     printf("  \"matrix_contract\": [\n");
     
     // 5.1 defaults
-    float gains51_def[5] = {1.0f, 1.0f, 0.90f, 0.55f, 0.25f};
-    print_report("5.1 defaults", 1, gains51_def, (float[6]){1.0f, 1.0f, 0.760f, 0.780f, 0.620f, 0.030f});
-    
+    float gains51_def[6] = {1.0f, 1.0f, 0.90f, 0.55f, 0.55f, 0.25f};
+    print_report("5.1 defaults", 1, gains51_def, (float[8]){1.0f, 1.0f, 0.760f, 0.780f, 0.780f, 0.620f, 0.620f, 0.030f});
+
     // 7.1 defaults
-    float gains71_def[6] = {1.0f, 1.0f, 0.760f, 0.780f, 0.620f, 0.030f};
-    print_report("7.1 defaults", 2, (float[5]){1.0f, 1.0f, 0.90f, 0.55f, 0.25f}, gains71_def);
-    
+    float gains71_def[8] = {1.0f, 1.0f, 0.760f, 0.780f, 0.780f, 0.620f, 0.620f, 0.030f};
+    print_report("7.1 defaults", 2, (float[6]){1.0f, 1.0f, 0.90f, 0.55f, 0.55f, 0.25f}, gains71_def);
+
     // 5.1 custom gains
-    float gains51_cust[5] = {0.8f, 1.2f, 0.5f, 0.3f, 1.5f};
-    print_report("5.1 custom gains", 1, gains51_cust, (float[6]){1.0f, 1.0f, 0.760f, 0.780f, 0.620f, 0.030f});
-    
+    float gains51_cust[6] = {0.8f, 1.2f, 0.5f, 0.3f, 0.3f, 1.5f};
+    print_report("5.1 custom gains", 1, gains51_cust, (float[8]){1.0f, 1.0f, 0.760f, 0.780f, 0.780f, 0.620f, 0.620f, 0.030f});
+
     // 7.1 custom gains
-    float gains71_cust[6] = {0.5f, 1.5f, 0.5f, 0.9f, 0.4f, 2.0f};
-    print_report("7.1 custom gains", 2, (float[5]){1.0f, 1.0f, 0.90f, 0.55f, 0.25f}, gains71_cust);
-    
+    float gains71_cust[8] = {0.5f, 1.5f, 0.5f, 0.9f, 0.9f, 0.4f, 0.4f, 2.0f};
+    print_report("7.1 custom gains", 2, (float[6]){1.0f, 1.0f, 0.90f, 0.55f, 0.55f, 0.25f}, gains71_cust);
+
     // 5.1 zero gains
-    float gains51_zero[5] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
-    print_report("5.1 zero gains", 1, gains51_zero, (float[6]){1.0f, 1.0f, 0.760f, 0.780f, 0.620f, 0.030f});
-    
+    float gains51_zero[6] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+    print_report("5.1 zero gains", 1, gains51_zero, (float[8]){1.0f, 1.0f, 0.760f, 0.780f, 0.780f, 0.620f, 0.620f, 0.030f});
+
     // 7.1 zero gains
-    float gains71_zero[6] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
-    print_report("7.1 zero gains", 2, (float[5]){1.0f, 1.0f, 0.90f, 0.55f, 0.25f}, gains71_zero);
-    
+    float gains71_zero[8] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+    print_report("7.1 zero gains", 2, (float[6]){1.0f, 1.0f, 0.90f, 0.55f, 0.55f, 0.25f}, gains71_zero);
+
     // 5.1 gains > 1.0
-    float gains51_high[5] = {2.0f, 1.5f, 3.0f, 2.5f, 2.0f};
-    print_report("5.1 gains > 1.0", 1, gains51_high, (float[6]){1.0f, 1.0f, 0.760f, 0.780f, 0.620f, 0.030f});
-    
+    float gains51_high[6] = {2.0f, 1.5f, 3.0f, 2.5f, 2.5f, 2.0f};
+    print_report("5.1 gains > 1.0", 1, gains51_high, (float[8]){1.0f, 1.0f, 0.760f, 0.780f, 0.780f, 0.620f, 0.620f, 0.030f});
+
     // 7.1 gains > 1.0
-    float gains71_high[6] = {1.5f, 2.0f, 1.5f, 1.2f, 1.3f, 2.0f};
-    print_report("7.1 gains > 1.0", 2, (float[5]){1.0f, 1.0f, 0.90f, 0.55f, 0.25f}, gains71_high);
+    float gains71_high[8] = {1.5f, 2.0f, 1.5f, 1.2f, 1.2f, 1.3f, 1.3f, 2.0f};
+    print_report("7.1 gains > 1.0", 2, (float[6]){1.0f, 1.0f, 0.90f, 0.55f, 0.55f, 0.25f}, gains71_high);
     
     // matrix none (already covered by defaults with matrix_oba=none, matrix_cba=none)
     printf("  {\n");

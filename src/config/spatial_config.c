@@ -30,12 +30,12 @@ static void build_matrix_5_1(const spatial_config_t* config, spatial_matrix_t* m
     matrix->matrix[SPATIAL_CH_FR][1] = config->gains_5_1[1];
     matrix->matrix[SPATIAL_CH_FC][0] = config->gains_5_1[2] * C_TO_LR;
     matrix->matrix[SPATIAL_CH_FC][1] = config->gains_5_1[2] * C_TO_LR;
-    matrix->matrix[SPATIAL_CH_LFE][0] = config->gains_5_1[4] * 1.0f;
-    matrix->matrix[SPATIAL_CH_LFE][1] = config->gains_5_1[4] * 1.0f;
+    matrix->matrix[SPATIAL_CH_LFE][0] = config->gains_5_1[5] * 1.0f;
+    matrix->matrix[SPATIAL_CH_LFE][1] = config->gains_5_1[5] * 1.0f;
     matrix->matrix[SPATIAL_CH_SL][0] = config->gains_5_1[3] * S_TO_LR;
     matrix->matrix[SPATIAL_CH_SL][1] = config->gains_5_1[3] * S_TO_LR;
-    matrix->matrix[SPATIAL_CH_SR][0] = config->gains_5_1[3] * S_TO_LR;
-    matrix->matrix[SPATIAL_CH_SR][1] = config->gains_5_1[3] * S_TO_LR;
+    matrix->matrix[SPATIAL_CH_SR][0] = config->gains_5_1[4] * S_TO_LR;
+    matrix->matrix[SPATIAL_CH_SR][1] = config->gains_5_1[4] * S_TO_LR;
     
     matrix->valid = true;
 }
@@ -50,16 +50,16 @@ static void build_matrix_7_1(const spatial_config_t* config, spatial_matrix_t* m
     matrix->matrix[SPATIAL_CH_FR][1] = config->gains_7_1[1];
     matrix->matrix[SPATIAL_CH_FC][0] = config->gains_7_1[2] * C_TO_LR;
     matrix->matrix[SPATIAL_CH_FC][1] = config->gains_7_1[2] * C_TO_LR;
-    matrix->matrix[SPATIAL_CH_LFE][0] = config->gains_7_1[5] * 1.0f;
-    matrix->matrix[SPATIAL_CH_LFE][1] = config->gains_7_1[5] * 1.0f;
+    matrix->matrix[SPATIAL_CH_LFE][0] = config->gains_7_1[7] * 1.0f;
+    matrix->matrix[SPATIAL_CH_LFE][1] = config->gains_7_1[7] * 1.0f;
     matrix->matrix[SPATIAL_CH_SL][0] = config->gains_7_1[3] * S_TO_LR;
     matrix->matrix[SPATIAL_CH_SL][1] = config->gains_7_1[3] * S_TO_LR;
-    matrix->matrix[SPATIAL_CH_SR][0] = config->gains_7_1[3] * S_TO_LR;
-    matrix->matrix[SPATIAL_CH_SR][1] = config->gains_7_1[3] * S_TO_LR;
-    matrix->matrix[SPATIAL_CH_BL][0] = config->gains_7_1[4] * REAR_TO_LR;
-    matrix->matrix[SPATIAL_CH_BL][1] = config->gains_7_1[4] * REAR_TO_LR;
-    matrix->matrix[SPATIAL_CH_BR][0] = config->gains_7_1[4] * REAR_TO_LR;
-    matrix->matrix[SPATIAL_CH_BR][1] = config->gains_7_1[4] * REAR_TO_LR;
+    matrix->matrix[SPATIAL_CH_SR][0] = config->gains_7_1[4] * S_TO_LR;
+    matrix->matrix[SPATIAL_CH_SR][1] = config->gains_7_1[4] * S_TO_LR;
+    matrix->matrix[SPATIAL_CH_BL][0] = config->gains_7_1[5] * REAR_TO_LR;
+    matrix->matrix[SPATIAL_CH_BL][1] = config->gains_7_1[5] * REAR_TO_LR;
+    matrix->matrix[SPATIAL_CH_BR][0] = config->gains_7_1[6] * REAR_TO_LR;
+    matrix->matrix[SPATIAL_CH_BR][1] = config->gains_7_1[6] * REAR_TO_LR;
     
     matrix->valid = true;
 }
@@ -93,13 +93,16 @@ void spatial_config_get_defaults(spatial_config_t* config) {
     config->gains_5_1[1] = 1.0f;
     config->gains_5_1[2] = 0.90f;
     config->gains_5_1[3] = 0.55f;
-    config->gains_5_1[4] = 0.25f;
+    config->gains_5_1[4] = 0.55f;
+    config->gains_5_1[5] = 0.25f;
     config->gains_7_1[0] = 1.0f;
     config->gains_7_1[1] = 1.0f;
     config->gains_7_1[2] = 0.760f;
     config->gains_7_1[3] = 0.780f;
-    config->gains_7_1[4] = 0.620f;
-    config->gains_7_1[5] = 0.030f;
+    config->gains_7_1[4] = 0.780f;
+    config->gains_7_1[5] = 0.620f;
+    config->gains_7_1[6] = 0.620f;
+    config->gains_7_1[7] = 0.030f;
     config->matrix_oba = 0;
     config->matrix_cba = 0;
     config->content_type = 0;

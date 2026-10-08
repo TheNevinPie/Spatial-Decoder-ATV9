@@ -69,10 +69,10 @@ static void build_matrix_for_layout(const spatial_downmix_config_t* config, spat
             matrix[SPATIAL_CH_FC][1] = config->gains_5_1.center * C_TO_LR;
             matrix[SPATIAL_CH_LFE][0] = config->gains_5_1.lfe * LFE_TO_LR;
             matrix[SPATIAL_CH_LFE][1] = config->gains_5_1.lfe * LFE_TO_LR;
-            matrix[SPATIAL_CH_SL][0] = config->gains_5_1.surround * S_TO_LR;
-            matrix[SPATIAL_CH_SL][1] = config->gains_5_1.surround * S_TO_LR;
-            matrix[SPATIAL_CH_SR][0] = config->gains_5_1.surround * S_TO_LR;
-            matrix[SPATIAL_CH_SR][1] = config->gains_5_1.surround * S_TO_LR;
+            matrix[SPATIAL_CH_SL][0] = config->gains_5_1.surround_left * S_TO_LR;
+            matrix[SPATIAL_CH_SL][1] = config->gains_5_1.surround_left * S_TO_LR;
+            matrix[SPATIAL_CH_SR][0] = config->gains_5_1.surround_right * S_TO_LR;
+            matrix[SPATIAL_CH_SR][1] = config->gains_5_1.surround_right * S_TO_LR;
             break;
         }
         case SPATIAL_LAYOUT_7_1: {
@@ -82,14 +82,14 @@ static void build_matrix_for_layout(const spatial_downmix_config_t* config, spat
             matrix[SPATIAL_CH_FC][1] = config->gains_7_1.center * C_TO_LR;
             matrix[SPATIAL_CH_LFE][0] = config->gains_7_1.lfe * LFE_TO_LR;
             matrix[SPATIAL_CH_LFE][1] = config->gains_7_1.lfe * LFE_TO_LR;
-            matrix[SPATIAL_CH_SL][0] = config->gains_7_1.side * S_TO_LR;
-            matrix[SPATIAL_CH_SL][1] = config->gains_7_1.side * S_TO_LR;
-            matrix[SPATIAL_CH_SR][0] = config->gains_7_1.side * S_TO_LR;
-            matrix[SPATIAL_CH_SR][1] = config->gains_7_1.side * S_TO_LR;
-            matrix[SPATIAL_CH_BL][0] = config->gains_7_1.rear * REAR_TO_LR;
-            matrix[SPATIAL_CH_BL][1] = config->gains_7_1.rear * REAR_TO_LR;
-            matrix[SPATIAL_CH_BR][0] = config->gains_7_1.rear * REAR_TO_LR;
-            matrix[SPATIAL_CH_BR][1] = config->gains_7_1.rear * REAR_TO_LR;
+            matrix[SPATIAL_CH_SL][0] = config->gains_7_1.side_left * S_TO_LR;
+            matrix[SPATIAL_CH_SL][1] = config->gains_7_1.side_left * S_TO_LR;
+            matrix[SPATIAL_CH_SR][0] = config->gains_7_1.side_right * S_TO_LR;
+            matrix[SPATIAL_CH_SR][1] = config->gains_7_1.side_right * S_TO_LR;
+            matrix[SPATIAL_CH_BL][0] = config->gains_7_1.rear_left * REAR_TO_LR;
+            matrix[SPATIAL_CH_BL][1] = config->gains_7_1.rear_left * REAR_TO_LR;
+            matrix[SPATIAL_CH_BR][0] = config->gains_7_1.rear_right * REAR_TO_LR;
+            matrix[SPATIAL_CH_BR][1] = config->gains_7_1.rear_right * REAR_TO_LR;
             break;
         }
         case SPATIAL_LAYOUT_STEREO:
@@ -186,7 +186,8 @@ static int gains_equal_5_1(const spatial_gains_5_1_t* a, const spatial_gains_5_1
     return a->left == b->left &&
            a->right == b->right &&
            a->center == b->center &&
-           a->surround == b->surround &&
+           a->surround_left == b->surround_left &&
+           a->surround_right == b->surround_right &&
            a->lfe == b->lfe;
 }
 
@@ -194,8 +195,10 @@ static int gains_equal_7_1(const spatial_gains_7_1_t* a, const spatial_gains_7_1
     return a->left == b->left &&
            a->right == b->right &&
            a->center == b->center &&
-           a->side == b->side &&
-           a->rear == b->rear &&
+           a->side_left == b->side_left &&
+           a->side_right == b->side_right &&
+           a->rear_left == b->rear_left &&
+           a->rear_right == b->rear_right &&
            a->lfe == b->lfe;
 }
 
@@ -282,14 +285,17 @@ void spatial_downmix_get_default_config_5_1(spatial_downmix_config_t* config) {
     config->gains_5_1.left = 1.0f;
     config->gains_5_1.right = 1.0f;
     config->gains_5_1.center = 0.90f;
-    config->gains_5_1.surround = 0.55f;
+    config->gains_5_1.surround_left = 0.55f;
+    config->gains_5_1.surround_right = 0.55f;
     config->gains_5_1.lfe = 0.25f;
 
     config->gains_7_1.left = 1.0f;
     config->gains_7_1.right = 1.0f;
     config->gains_7_1.center = 0.760f;
-    config->gains_7_1.side = 0.780f;
-    config->gains_7_1.rear = 0.620f;
+    config->gains_7_1.side_left = 0.780f;
+    config->gains_7_1.side_right = 0.780f;
+    config->gains_7_1.rear_left = 0.620f;
+    config->gains_7_1.rear_right = 0.620f;
     config->gains_7_1.lfe = 0.030f;
 
     config->matrix_oba = SPATIAL_MATRIX_NONE;

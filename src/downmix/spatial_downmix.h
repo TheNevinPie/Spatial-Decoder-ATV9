@@ -15,7 +15,8 @@ typedef struct {
     float left;
     float right;
     float center;
-    float surround;
+    float surround_left;
+    float surround_right;
     float lfe;
 } spatial_gains_5_1_t;
 
@@ -23,8 +24,10 @@ typedef struct {
     float left;
     float right;
     float center;
-    float side;
-    float rear;
+    float side_left;
+    float side_right;
+    float rear_left;
+    float rear_right;
     float lfe;
 } spatial_gains_7_1_t;
 

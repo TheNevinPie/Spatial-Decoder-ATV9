@@ -12,14 +12,15 @@ static void print_config(const spatial_config_t* config) {
     printf("\n=== Current Configuration ===\n");
     printf("Layout: %d\n", config->layout);
     printf("Generation: %lu\n", (unsigned long)config->generation);
-    printf("5.1 Gains: L=%.3f R=%.3f C=%.3f S=%.3f LFE=%.3f\n",
+    printf("5.1 Gains: L=%.3f R=%.3f C=%.3f SL=%.3f SR=%.3f LFE=%.3f\n",
            config->gains_5_1[0], config->gains_5_1[1],
            config->gains_5_1[2], config->gains_5_1[3],
-           config->gains_5_1[4]);
-    printf("7.1 Gains: L=%.3f R=%.3f C=%.3f Side=%.3f Rear=%.3f LFE=%.3f\n",
+           config->gains_5_1[4], config->gains_5_1[5]);
+    printf("7.1 Gains: L=%.3f R=%.3f C=%.3f SL=%.3f SR=%.3f BL=%.3f BR=%.3f LFE=%.3f\n",
            config->gains_7_1[0], config->gains_7_1[1],
            config->gains_7_1[2], config->gains_7_1[3],
-           config->gains_7_1[4], config->gains_7_1[5]);
+           config->gains_7_1[4], config->gains_7_1[5],
+           config->gains_7_1[6], config->gains_7_1[7]);
     printf("Matrix OBA: %d, CBA: %d\n", config->matrix_oba, config->matrix_cba);
     printf("Debug: %s\n", config->debug_enabled ? "on" : "off");
     printf("============================\n\n");
