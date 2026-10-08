@@ -252,11 +252,17 @@
             <Limit name="sample-rate" ranges="8000,16000,32000,44100,48000,88200,96000,176400,192000" />
             <Limit name="bitrate" range="32000-24576000" />
         </MediaCodec>
+        <!-- TEMP-PROD-SELECTION: stock OMX.google.dtslbr.dec delisted. Its MIME
+             audio/vnd.dts.lbr shares role audio_decoder.dts with audio/vnd.dts;
+             the parser keeps only the first type per role, so this entry was
+             never bytype-resolvable AND now blocks OMX.test.spatial.dts.
+             dtshd/dtse above stay listed.
         <MediaCodec name="OMX.google.dtslbr.dec" type="audio/vnd.dts.lbr">
             <Limit name="channel-count" max="8" />
             <Limit name="sample-rate" ranges="8000,16000,32000,44100,48000,88200,96000,176400,192000" />
             <Limit name="bitrate" range="32000-24576000" />
         </MediaCodec>
+        TEMP-PROD-SELECTION End -->
         <!-- TEMP-PROD-SELECTION: stock OMX.google.truehd.decoder delisted, see above.
         <MediaCodec name="OMX.google.truehd.decoder" type="audio/true-hd">
             <Limit name="channel-count" max="8" />
