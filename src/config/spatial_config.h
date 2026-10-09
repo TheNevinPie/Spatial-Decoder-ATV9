@@ -21,6 +21,15 @@ typedef enum {
     SPATIAL_CONTENT_OBA = 1,
 } spatial_content_type_t;
 
+// Optional post-downmix dynamic range compression. OFF reproduces the
+// linear downmix bit-identically; FILM/NIGHT select fixed linked-stereo
+// soft-knee compressor profiles (see spatial_downmix.c).
+typedef enum {
+    SPATIAL_DRC_OFF = 0,
+    SPATIAL_DRC_FILM = 1,
+    SPATIAL_DRC_NIGHT = 2,
+} spatial_drc_mode_t;
+
 typedef spatial_channel_t spatial_channel_id_t;
 
 typedef struct {
@@ -40,6 +49,7 @@ typedef struct {
     spatial_matrix_mode_t matrix_oba;
     spatial_matrix_mode_t matrix_cba;
     spatial_content_type_t content_type;
+    spatial_drc_mode_t drc_mode;
     bool debug_enabled;
     uint64_t generation;
 } spatial_config_t;

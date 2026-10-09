@@ -43,6 +43,10 @@ typedef struct {
 
     spatial_content_type_t content_type;
 
+    // Optional post-downmix DRC (linked stereo). OFF = pure linear
+    // downmix, bit-identical to the pre-DRC implementation.
+    spatial_drc_mode_t drc_mode;
+
     int debug_enabled;
 } spatial_downmix_config_t;
 
@@ -62,6 +66,10 @@ int spatial_downmix_update_config(spatial_downmix_ctx_t* ctx, const spatial_down
 int spatial_downmix_set_config_manager(spatial_downmix_ctx_t* ctx, spatial_config_mgr_t* config_mgr);
 
 int spatial_downmix_set_channel_map(spatial_downmix_ctx_t* ctx, const int* channel_map, int num_channels);
+
+// Reset runtime DSP state (DRC envelope) to unity. Called on flush/reset;
+// performs no allocation.
+void spatial_downmix_reset(spatial_downmix_ctx_t* ctx);
 
 void spatial_downmix_get_default_config_5_1(spatial_downmix_config_t* config);
 void spatial_downmix_get_default_config_7_1(spatial_downmix_config_t* config);

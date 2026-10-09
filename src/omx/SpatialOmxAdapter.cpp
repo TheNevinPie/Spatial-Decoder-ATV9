@@ -385,6 +385,11 @@ void SpatialOmxAdapter::resetStreamState() {
     if (mDecoder != NULL) {
         spatial_decoder_flush(mDecoder);
     }
+    if (mDownmix != NULL) {
+        // Drop compressor state with the stream (no allocation, the
+        // envelope simply returns to unity).
+        spatial_downmix_reset(mDownmix);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1349,6 +1354,7 @@ void SpatialOmxAdapter::refreshConfigIfNeeded(bool force) {
     dm.matrix_oba = cfg.matrix_oba;
     dm.matrix_cba = cfg.matrix_cba;
     dm.content_type = cfg.content_type;
+    dm.drc_mode = cfg.drc_mode;
     dm.debug_enabled = cfg.debug_enabled ? 1 : 0;
 
     bool changed = !mHaveAppliedDownmix
@@ -1359,16 +1365,18 @@ void SpatialOmxAdapter::refreshConfigIfNeeded(bool force) {
         mHaveAppliedDownmix = true;
         if (mDebug) {
             if (dm.layout == SPATIAL_LAYOUT_5_1) {
-                ALOGI("downmix 5.1: L=%.3f R=%.3f C=%.3f SL=%.3f SR=%.3f LFE=%.3f",
+                ALOGI("downmix 5.1: L=%.3f R=%.3f C=%.3f SL=%.3f SR=%.3f LFE=%.3f drc=%d",
                         dm.gains_5_1.left, dm.gains_5_1.right,
                         dm.gains_5_1.center, dm.gains_5_1.surround_left,
-                        dm.gains_5_1.surround_right, dm.gains_5_1.lfe);
+                        dm.gains_5_1.surround_right, dm.gains_5_1.lfe,
+                        (int)dm.drc_mode);
             } else {
-                ALOGI("downmix 7.1: L=%.3f R=%.3f C=%.3f SL=%.3f SR=%.3f BL=%.3f BR=%.3f LFE=%.3f",
+                ALOGI("downmix 7.1: L=%.3f R=%.3f C=%.3f SL=%.3f SR=%.3f BL=%.3f BR=%.3f LFE=%.3f drc=%d",
                         dm.gains_7_1.left, dm.gains_7_1.right,
                         dm.gains_7_1.center, dm.gains_7_1.side_left,
                         dm.gains_7_1.side_right, dm.gains_7_1.rear_left,
-                        dm.gains_7_1.rear_right, dm.gains_7_1.lfe);
+                        dm.gains_7_1.rear_right, dm.gains_7_1.lfe,
+                        (int)dm.drc_mode);
             }
         }
     }

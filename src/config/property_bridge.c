@@ -48,6 +48,8 @@
 #define PROP_MATRIX_OBA "persist.vendor.spatialdm.matrix_encoding.oba"
 #define PROP_MATRIX_CBA "persist.vendor.spatialdm.matrix_encoding.cba"
 
+#define PROP_DRC "persist.vendor.spatialdm.drc"
+
 #define MAX_PROP_VALUE 92
 
 struct spatial_property_ctx {
@@ -276,7 +278,23 @@ int spatial_property_read_all(spatial_property_ctx_t* ctx, spatial_config_t* out
             ALOGW("Property 'persist.vendor.spatialdm.content_type' invalid value '%s', using default", content_str);
         }
     }
-    
+
+    // Optional post-downmix DRC. Unset or unrecognized stays OFF, which
+    // reproduces the linear downmix bit-identically.
+    char drc_str[32];
+    if (read_prop_string(PROP_DRC, drc_str, sizeof(drc_str))) {
+        if (strcmp(drc_str, "off") == 0) {
+            out_config->drc_mode = SPATIAL_DRC_OFF;
+        } else if (strcmp(drc_str, "film") == 0) {
+            out_config->drc_mode = SPATIAL_DRC_FILM;
+        } else if (strcmp(drc_str, "night") == 0) {
+            out_config->drc_mode = SPATIAL_DRC_NIGHT;
+        } else {
+            ALOGW("Property '%s' invalid value '%s', using default (off)",
+                    PROP_DRC, drc_str);
+        }
+    }
+
     out_config->generation = 0;
     return 0;
 }
