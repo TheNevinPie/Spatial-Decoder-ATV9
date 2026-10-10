@@ -80,21 +80,3 @@ Unset properties reproduce the production matrix bit-for-bit. Configuration
 is re-read off the audio path (throttled refresh) and published through the
 existing atomic generation-gated snapshot; the sample loop only reads cached
 coefficients (no property reads, allocations, or locks).
-
-## Optional post-downmix DRC
-
-`persist.vendor.spatialdm.drc` selects an optional fixed linked-stereo
-compressor AFTER the matrix (`off` default). `off` reproduces the linear
-downmix bit-identically. No dialogue detection, EQ, widening, limiter,
-or per-channel compression — one gain-reduction envelope from the joint
-L+R peak applied to both channels, so the image never shifts.
-
-| Value | Threshold | Ratio | Attack | Release | Makeup | Knee |
-|---|---|---|---|---|---|---|
-| `off` | — | — | — | — | — | — |
-| `film` | -18 dBFS | 2:1 | 10 ms | 150 ms | 0 dB | ~6 dB |
-| `night` | -30 dBFS | 4:1 | 5 ms | 250 ms | 0 dB | ~6 dB |
-
-Starting points for calibration, not final tuning. DRC normally reduces
-peaks; the existing saturating float→S16 cast is preserved. Envelope
-state is preallocated and cleared on flush/reset with the stream.

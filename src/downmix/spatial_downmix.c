@@ -17,73 +17,12 @@ struct spatial_downmix_ctx {
     uint64_t last_matrix_generation;
     int channel_map[MAX_CHANNELS];
     int num_input_channels;
-    // Linked-stereo DRC envelope: single linear gain applied to L and R
-    // together (never independent per channel: that would move the stereo
-    // image). Unity when DRC is off or after reset.
-    float drc_env;
 };
 
 static const float C_TO_LR = 0.7071067811865475f;
 static const float S_TO_LR = 0.7071067811865475f;
 static const float REAR_TO_LR = 0.7071067811865475f;
 static const float LFE_TO_LR = 1.0f;
-
-// Fixed DRC profiles (tunable starting points). The downmix output is
-// always 48 kHz stereo in this system; ballistics below assume that rate.
-#define SPATIAL_DRC_RATE 48000.0f
-
-typedef struct {
-    float threshold_db;  // static curve threshold, dBFS
-    float ratio;         // compression ratio above threshold
-    float attack_ms;     // envelope attack time constant
-    float release_ms;    // envelope release time constant
-    float makeup_db;     // output makeup (0 keeps peaks reduced, never boosts)
-    float knee_db;       // soft-knee width around threshold
-} drc_profile_t;
-
-static const drc_profile_t kDrcProfiles[3] = {
-    // OFF (unused; process() bypasses DRC entirely in this mode).
-    {0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f},
-    // FILM: gentle leveling above -18 dBFS.
-    {-18.0f, 2.0f, 10.0f, 150.0f, 0.0f, 6.0f},
-    // NIGHT: stronger leveling above -30 dBFS, no blind makeup gain.
-    {-30.0f, 4.0f, 5.0f, 250.0f, 0.0f, 6.0f},
-};
-
-// Static soft-knee gain computer. Returns the LINEAR target gain for an
-// instantaneous linked peak (0..1 output; never boosts: the makeup field
-// is reserved for measured tuning and clamped here).
-static float drc_target_gain(const drc_profile_t* p, float peak) {
-    // peak <= 0 covers silence; !(peak > 0) additionally covers NaN.
-    if (!(peak > 0.0f)) {
-        return 1.0f;
-    }
-    float indb = 20.0f * log10f(peak);
-    float outdb;
-    float half_knee = p->knee_db * 0.5f;
-    if (indb <= p->threshold_db - half_knee) {
-        outdb = indb;
-    } else if (indb >= p->threshold_db + half_knee) {
-        outdb = p->threshold_db + (indb - p->threshold_db) / p->ratio;
-    } else {
-        float x = indb - p->threshold_db + half_knee;
-        outdb = indb + (1.0f / p->ratio - 1.0f)
-                * x * x / (2.0f * p->knee_db);
-    }
-    outdb += p->makeup_db;
-    float grdb = outdb - indb;
-    if (grdb >= 0.0f) {
-        return 1.0f;
-    }
-    return powf(10.0f, grdb * (1.0f / 20.0f));
-}
-
-void spatial_downmix_reset(spatial_downmix_ctx_t* ctx) {
-    if (ctx == NULL) {
-        return;
-    }
-    ctx->drc_env = 1.0f;
-}
 
 static void init_default_channel_map(spatial_downmix_ctx_t* ctx) {
     switch (ctx->config.layout) {
@@ -179,16 +118,6 @@ static void ensure_matrix_up_to_date(spatial_downmix_ctx_t* ctx) {
             ctx->current_layout = matrix->layout;
             ctx->last_matrix_generation = matrix->generation;
             ctx->matrix_valid = 1;
-            // DRC mode follows the same generation so the standalone
-            // manager path and the direct update_config path agree.
-            {
-                const spatial_config_t* cur =
-                        spatial_config_get_current(ctx->config_mgr);
-                if (cur != NULL && cur->drc_mode >= SPATIAL_DRC_OFF
-                        && cur->drc_mode <= SPATIAL_DRC_NIGHT) {
-                    ctx->config.drc_mode = cur->drc_mode;
-                }
-            }
         }
     } else {
         if (!ctx->matrix_valid || ctx->current_layout != ctx->config.layout) {
@@ -215,7 +144,6 @@ spatial_downmix_ctx_t* spatial_downmix_create(const spatial_downmix_config_t* co
     ctx->current_layout = SPATIAL_LAYOUT_STEREO;
     ctx->last_matrix_generation = 0;
     ctx->config_mgr = NULL;
-    ctx->drc_env = 1.0f;
     
     init_default_channel_map(ctx);
 
@@ -329,62 +257,20 @@ int spatial_downmix_process(spatial_downmix_ctx_t* ctx,
         }
     }
 
-    // OFF path: pure linear downmix, exactly the pre-DRC behavior.
-    if (ctx->config.drc_mode != SPATIAL_DRC_FILM
-            && ctx->config.drc_mode != SPATIAL_DRC_NIGHT) {
-        for (size_t f = 0; f < frames; f++) {
-            float l = 0.0f;
-            float r = 0.0f;
+    for (size_t f = 0; f < frames; f++) {
+        float l = 0.0f;
+        float r = 0.0f;
 
-            for (int c = 0; c < num_input_channels; c++) {
-                int logical_ch = ctx->channel_map[c];
-                if (logical_ch >= 0 && logical_ch < MAX_CHANNELS) {
-                    l += input[f * num_input_channels + c] * ctx->matrix[logical_ch][0];
-                    r += input[f * num_input_channels + c] * ctx->matrix[logical_ch][1];
-                }
+        for (int c = 0; c < num_input_channels; c++) {
+            int logical_ch = ctx->channel_map[c];
+            if (logical_ch >= 0 && logical_ch < MAX_CHANNELS) {
+                l += input[f * num_input_channels + c] * ctx->matrix[logical_ch][0];
+                r += input[f * num_input_channels + c] * ctx->matrix[logical_ch][1];
             }
-
-            output[f * 2 + 0] = l;
-            output[f * 2 + 1] = r;
         }
 
-        return 0;
-    }
-
-    // Linked-stereo DRC path: identical matrix mix, then one shared
-    // gain-reduction envelope applied to L and R together (the detector
-    // level comes from both channels, so the image never shifts).
-    // Ballistics resolved once per call; no allocation, no locks,
-    // no property access. Envelope state lives in the ctx (preallocated
-    // at create, cleared by spatial_downmix_reset on flush).
-    {
-        const drc_profile_t* prof =
-                &kDrcProfiles[(int)ctx->config.drc_mode];
-        float attack_c = expf(-1.0f
-                / (SPATIAL_DRC_RATE * (prof->attack_ms / 1000.0f)));
-        float release_c = expf(-1.0f
-                / (SPATIAL_DRC_RATE * (prof->release_ms / 1000.0f)));
-        float env = ctx->drc_env;
-        for (size_t f = 0; f < frames; f++) {
-            float l = 0.0f;
-            float r = 0.0f;
-
-            for (int c = 0; c < num_input_channels; c++) {
-                int logical_ch = ctx->channel_map[c];
-                if (logical_ch >= 0 && logical_ch < MAX_CHANNELS) {
-                    l += input[f * num_input_channels + c] * ctx->matrix[logical_ch][0];
-                    r += input[f * num_input_channels + c] * ctx->matrix[logical_ch][1];
-                }
-            }
-
-            float peak = fabsf(l) > fabsf(r) ? fabsf(l) : fabsf(r);
-            float target = drc_target_gain(prof, peak);
-            float c = (target < env) ? attack_c : release_c;
-            env = target + (env - target) * c;
-            output[f * 2 + 0] = l * env;
-            output[f * 2 + 1] = r * env;
-        }
-        ctx->drc_env = env;
+        output[f * 2 + 0] = l;
+        output[f * 2 + 1] = r;
     }
 
     return 0;

@@ -106,7 +106,6 @@ void spatial_config_get_defaults(spatial_config_t* config) {
     config->matrix_oba = 0;
     config->matrix_cba = 0;
     config->content_type = 0;
-    config->drc_mode = SPATIAL_DRC_OFF;
     config->debug_enabled = false;
     config->generation = 0;
 }
