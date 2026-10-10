@@ -1096,6 +1096,23 @@ void SpatialOmxAdapter::processFrame(const spatial_frame_t *frame) {
 
     while (remaining > 0) {
         int chunk = remaining > kMaxFrameSamples ? kMaxFrameSamples : remaining;
+        // Bound input so resampled output always fits mPlanar
+        // (kMaxFrameSamples floats/plane): with out_needed =
+        // floor(chunk*rr)+1, chunk <= floor(4095/rr) guarantees
+        // out_needed <= 4096. Downsampling (rr <= 1) needs no bound.
+        // Truncation in the floor keeps this exact (see analysis).
+        if (rate != kOutSampleRate && rate > 0) {
+            double rr = (double)kOutSampleRate / (double)rate;
+            if (rr > 1.0) {
+                int maxIn = (int)((kMaxFrameSamples - 1) / rr);
+                if (maxIn < 1) {
+                    maxIn = 1;
+                }
+                if (chunk > maxIn) {
+                    chunk = maxIn;
+                }
+            }
+        }
 
         const uint8_t *inPtrs[SPATIAL_CH_MAX];
         uint8_t *outPtrs[SPATIAL_CH_MAX];
@@ -1121,19 +1138,24 @@ void SpatialOmxAdapter::processFrame(const spatial_frame_t *frame) {
             }
         }
 
-        if (spatial_pcm_converter_process(
-                    mPcm, inPtrs, outPtrs, chunk) != 0) {
+        // Authoritative produced count (never the local estimate): the
+        // converter enforces the mPlanar capacity and reports truncation.
+        int produced = 0;
+        int cvt = spatial_pcm_converter_process_capped(
+                mPcm, inPtrs, outPtrs, chunk, 0, kMaxFrameSamples,
+                &produced);
+        if (cvt != 0 || produced <= 0) {
             ALOGW("SpatialOmxAdapter: PCM convert failed");
             return;
         }
-
-        // Expected resampled length (mirrors the converter's formula).
-        double ratio = (double)kOutSampleRate / (double)rate;
-        int outSamples = (rate == kOutSampleRate)
-                ? chunk : (int)(chunk * ratio) + 1;
-        if (outSamples > kMaxFrameSamples) {
-            outSamples = kMaxFrameSamples;
+        if (produced > kMaxFrameSamples) {
+            // Contract violation canary (unreachable: pre-chunking plus
+            // converter capacity enforcement); never stage corrupt counts.
+            ALOGW("SpatialOmxAdapter: PCM produced %d exceeds plane cap",
+                    produced);
+            return;
         }
+        int outSamples = produced;
 
         if (nch == kOutChannels) {
             // Stereo: straight to float stereo (no downmix matrix).

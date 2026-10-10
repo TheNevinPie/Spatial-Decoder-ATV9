@@ -50,6 +50,25 @@ int spatial_pcm_converter_process(spatial_pcm_converter_t* converter,
                                   uint8_t* const output_data[8],
                                   int nb_samples);
 
+// Capacity-aware processing. output_data planes each hold out_capacity
+// output samples; production starts at out_offset (0 for a fresh frame).
+// Return: 0 = all nb_samples converted (out_produced == full need);
+// 1 = truncated, out_produced < need; call again with out_offset advanced
+// by *out_produced and the SAME input to produce the remainder (each
+// output sample depends only on the input, so split calls concatenate
+// bitwise-exactly). -1 = argument/format error; nothing is written and
+// *out_produced (if non-NULL) is set to 0. out_produced may be NULL.
+// The legacy process() above enforces the documented 4096-sample ceiling
+// and reports oversize resampled output as an error instead of
+// overflowing the destination.
+int spatial_pcm_converter_process_capped(spatial_pcm_converter_t* converter,
+                                  const uint8_t* const input_data[8],
+                                  uint8_t* const output_data[8],
+                                  int nb_samples,
+                                  int out_offset,
+                                  int out_capacity,
+                                  int* out_produced);
+
 int spatial_pcm_converter_flush(spatial_pcm_converter_t* converter);
 
 int spatial_pcm_format_get_bytes_per_sample(spatial_sample_fmt_t fmt);

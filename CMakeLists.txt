@@ -204,6 +204,9 @@ if(BUILD_TESTS)
 
     add_executable(test_downmix tests/downmix_test.c)
     target_link_libraries(test_downmix spatial_downmix spatial_config spatial_pcm ${FFMPEG_LIBRARIES})
+
+    add_executable(pcm_resample_test tests/pcm_resample_test.c)
+    target_link_libraries(pcm_resample_test spatial_pcm)
     if(NOT ANDROID_BUILD)
         # Host-only: Android property/log headers backed by environment
         # variables (tests/host_shim) so property_bridge.c compiles and
@@ -249,6 +252,7 @@ if(BUILD_TESTS)
 
     add_test(NAME decoder_test COMMAND test_decoder)
     add_test(NAME downmix_test COMMAND test_downmix)
+    add_test(NAME pcm_resample_test COMMAND pcm_resample_test)
 endif()
 
 install(TARGETS spatial_all

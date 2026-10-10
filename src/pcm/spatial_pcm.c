@@ -199,35 +199,111 @@ static int convert_sample_format(const void* input, void* output, int samples, s
 int spatial_pcm_converter_process(spatial_pcm_converter_t* conv,
                                   const uint8_t* const input_data[8],
                                   uint8_t* const output_data[8],
-                                  int nb_samples) {
-    if (!conv || !input_data || !output_data || nb_samples <= 0) return -1;
-    
-    // Documented maximum frame capacity - fail cleanly if exceeded
-    if (nb_samples > 4096) {
-        return -1;  // ERANGE would be better but keeping simple
+                                  int nb_samples);
+
+// Documented per-plane ceiling shared by the legacy entry point: output
+// planes are assumed to hold at least this many samples.
+#define SPATIAL_PCM_MAX_SAMPLES 4096
+
+// Validates arguments and computes the full resampled output need.
+// Returns the need (>= 1), or -1 on any error. Pure computation: never
+// writes to caller buffers, so callers can probe size before producing.
+static int output_needed(const spatial_pcm_converter_t* conv,
+        int nb_samples) {
+    if (!conv || nb_samples <= 0 || nb_samples > SPATIAL_PCM_MAX_SAMPLES) {
+        return -1;
     }
-    
+    int in_bytes = get_bytes_per_sample(conv->input_format.format);
+    int out_bytes = get_bytes_per_sample(conv->output_format.format);
+    if (in_bytes <= 0 || out_bytes <= 0) {
+        return -1;  // unknown sample format
+    }
+    if (!conv->needs_resample) {
+        return nb_samples;
+    }
+    // Bounds: nb_samples <= 4096 and ratio in (0, 64] keep the product
+    // far below INT_MAX; isfinite guards corrupt format structs.
+    double ratio = conv->resample_ratio;
+    if (!(ratio > 0.0) || !isfinite(ratio) || ratio > 64.0) {
+        return -1;
+    }
+    double need_d = (double)nb_samples * ratio + 1.0;
+    if (!isfinite(need_d)) {
+        return -1;
+    }
+    return (int)need_d;
+}
+
+int spatial_pcm_converter_process_capped(spatial_pcm_converter_t* conv,
+                                  const uint8_t* const input_data[8],
+                                  uint8_t* const output_data[8],
+                                  int nb_samples,
+                                  int out_offset,
+                                  int out_capacity,
+                                  int* out_produced) {
+    if (!conv || !input_data || !output_data) {
+        if (out_produced) {
+            *out_produced = 0;
+        }
+        return -1;
+    }
+    if (out_offset < 0 || out_capacity < 0) {
+        if (out_produced) {
+            *out_produced = 0;
+        }
+        return -1;
+    }
     int in_bytes = get_bytes_per_sample(conv->input_format.format);
     int out_bytes = get_bytes_per_sample(conv->output_format.format);
     bool in_planar = is_planar(conv->input_format.format);
     bool out_planar = is_planar(conv->output_format.format);
-    
     int in_channels = conv->input_format.num_channels;
     int out_channels = conv->output_format.num_channels;
-    
+    if (in_channels <= 0 || in_channels > 8
+            || out_channels <= 0 || out_channels > 8) {
+        if (out_produced) {
+            *out_produced = 0;
+        }
+        return -1;
+    }
+    int needed = output_needed(conv, nb_samples);
+    if (needed < 0) {
+        if (out_produced) {
+            *out_produced = 0;
+        }
+        return -1;
+    }
+    // Nothing remaining: vacuous success, no writes.
+    if (out_offset >= needed) {
+        if (out_produced) {
+            *out_produced = 0;
+        }
+        return 0;
+    }
+    int avail = out_capacity - out_offset;
+    if (avail <= 0) {
+        if (out_produced) {
+            *out_produced = 0;
+        }
+        return 1;  // no room: truncated, call again with room
+    }
+    int remain = needed - out_offset;
+    int count = remain < avail ? remain : avail;
+    int first = out_offset;
+    int last = out_offset + count;
+
     if (conv->needs_resample) {
-        int out_samples = (int)(nb_samples * conv->resample_ratio) + 1;
-        
         // temp_buffer is pre-allocated in create()
         double* src = (double*)conv->temp_buffer;
-        
+
         for (int ch = 0; ch < out_channels; ch++) {
             int src_ch = conv->remap_indices[ch];
             if (src_ch < 0 || src_ch >= in_channels) {
-                memset(output_data[ch], 0, out_samples * out_bytes);
+                memset(output_data[ch] + (size_t)first * (size_t)out_bytes,
+                        0, (size_t)count * (size_t)out_bytes);
                 continue;
             }
-            
+
             // Extract source channel to temp buffer
             for (int i = 0; i < nb_samples; i++) {
                 if (in_planar) {
@@ -240,8 +316,12 @@ int spatial_pcm_converter_process(spatial_pcm_converter_t* conv,
                                           conv->input_format.format, 6);  // convert to double
                 }
             }
-            
-            for (int i = 0; i < out_samples; i++) {
+
+            // Each output sample depends only on the input (absolute
+            // indexing), so a [first, last) window is exactly the same
+            // samples a full run would produce there: split calls
+            // concatenate bitwise-exactly.
+            for (int i = first; i < last; i++) {
                 double sum = 0;
                 for (int j = 0; j < conv->resample_filter_len; j++) {
                     int src_idx = (int)(i / conv->resample_ratio) - conv->resample_filter_len / 2 + j;
@@ -249,7 +329,7 @@ int spatial_pcm_converter_process(spatial_pcm_converter_t* conv,
                         sum += src[src_idx] * conv->resample_filter[j];
                     }
                 }
-                
+
                 if (out_planar) {
                     switch (conv->output_format.format) {
                         case 0: ((int16_t*)output_data[ch])[i] = (int16_t)(sum * 32767); break;
@@ -267,27 +347,31 @@ int spatial_pcm_converter_process(spatial_pcm_converter_t* conv,
         for (int ch = 0; ch < out_channels; ch++) {
             int src_ch = conv->remap_indices[ch];
             if (src_ch < 0 || src_ch >= in_channels) {
-                memset(output_data[ch], 0, nb_samples * out_bytes);
+                memset(output_data[ch] + (size_t)first * (size_t)out_bytes,
+                        0, (size_t)count * (size_t)out_bytes);
                 continue;
             }
-            
+
             if (in_planar && out_planar) {
-                convert_sample_format(input_data[src_ch], output_data[ch], nb_samples,
-                                    conv->input_format.format, conv->output_format.format);
+                convert_sample_format(
+                        input_data[src_ch] + (size_t)first * (size_t)in_bytes,
+                        output_data[ch] + (size_t)first * (size_t)out_bytes,
+                        count,
+                        conv->input_format.format, conv->output_format.format);
             } else if (!in_planar && !out_planar) {
-                for (int i = 0; i < nb_samples; i++) {
+                for (int i = first; i < last; i++) {
                     const uint8_t* src = input_data[0] + (i * in_channels + src_ch) * in_bytes;
                     uint8_t* dst = output_data[0] + (i * out_channels + ch) * out_bytes;
                     convert_sample_format(src, dst, 1, conv->input_format.format, conv->output_format.format);
                 }
             } else if (in_planar && !out_planar) {
-                for (int i = 0; i < nb_samples; i++) {
+                for (int i = first; i < last; i++) {
                     const uint8_t* src = input_data[src_ch] + i * in_bytes;
                     uint8_t* dst = output_data[0] + (i * out_channels + ch) * out_bytes;
                     convert_sample_format(src, dst, 1, conv->input_format.format, conv->output_format.format);
                 }
             } else {
-                for (int i = 0; i < nb_samples; i++) {
+                for (int i = first; i < last; i++) {
                     const uint8_t* src = input_data[0] + (i * in_channels + src_ch) * in_bytes;
                     uint8_t* dst = output_data[ch] + i * out_bytes;
                     convert_sample_format(src, dst, 1, conv->input_format.format, conv->output_format.format);
@@ -295,7 +379,26 @@ int spatial_pcm_converter_process(spatial_pcm_converter_t* conv,
             }
         }
     }
-    
+
+    if (out_produced) {
+        *out_produced = count;
+    }
+    return (out_offset + count >= needed) ? 0 : 1;
+}
+
+int spatial_pcm_converter_process(spatial_pcm_converter_t* conv,
+                                  const uint8_t* const input_data[8],
+                                  uint8_t* const output_data[8],
+                                  int nb_samples) {
+    // Legacy entry: full production against the documented ceiling.
+    // Oversize resampled output is a clean error (never an overflow);
+    // fitting inputs take the identical code path as before.
+    int produced = 0;
+    int r = spatial_pcm_converter_process_capped(conv, input_data,
+            output_data, nb_samples, 0, SPATIAL_PCM_MAX_SAMPLES, &produced);
+    if (r != 0) {
+        return -1;
+    }
     return 0;
 }
 
