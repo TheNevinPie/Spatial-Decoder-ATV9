@@ -349,10 +349,20 @@ int spatial_decoder_send_packet(spatial_decoder_t* decoder, const uint8_t* data,
 
 int spatial_decoder_receive_frame(spatial_decoder_t* decoder, spatial_frame_t* frame) {
     if (!decoder || !frame) return -1;
-    
-    DEBUG_PRINT("[spatial_decoder] Calling avcodec_receive_frame...\n");
+
+    // Single property evaluation per frame (not per log site): the flag
+    // is read once here; printing below adds no further property I/O.
+    // When disabled (production), this path performs zero logging I/O.
+    bool frame_dbg = is_debug_enabled();
+    if (frame_dbg) {
+        printf("[spatial_decoder] Calling avcodec_receive_frame...\n");
+        fflush(stdout);
+    }
     int ret = avcodec_receive_frame(decoder->codec_ctx, decoder->frame);
-    DEBUG_PRINT("[spatial_decoder] avcodec_receive_frame returned %d\n", ret);
+    if (frame_dbg) {
+        printf("[spatial_decoder] avcodec_receive_frame returned %d\n", ret);
+        fflush(stdout);
+    }
     if (ret == AVERROR(EAGAIN)) {
         return -11;
     } else if (ret == AVERROR_EOF) {
@@ -361,9 +371,10 @@ int spatial_decoder_receive_frame(spatial_decoder_t* decoder, spatial_frame_t* f
         return -6;
     }
     
-    printf("[spatial_decoder] Frame received, nb_samples=%d\n", decoder->frame->nb_samples);
-    fflush(stdout);
-    
+    if (frame_dbg) {
+        printf("[spatial_decoder] Frame received, nb_samples=%d\n", decoder->frame->nb_samples);
+        fflush(stdout);
+    }
     frame->nb_samples = decoder->frame->nb_samples;
     frame->sample_rate = decoder->frame->sample_rate;
     frame->format = ffmpeg_to_spatial_fmt(decoder->frame->format);
@@ -372,13 +383,17 @@ int spatial_decoder_receive_frame(spatial_decoder_t* decoder, spatial_frame_t* f
     
     AVChannelLayout ch_layout;
     av_channel_layout_copy(&ch_layout, &decoder->frame->ch_layout);
-    printf("[spatial_decoder] Calling build_channel_map...\n");
-    fflush(stdout);
+    if (frame_dbg) {
+        printf("[spatial_decoder] Calling build_channel_map...\n");
+        fflush(stdout);
+    }
     build_channel_map(&ch_layout, frame->channel_map, &frame->num_channels);
     av_channel_layout_uninit(&ch_layout);
-    
-    printf("[spatial_decoder] num_channels=%d\n", frame->num_channels);
-    fflush(stdout);
+
+    if (frame_dbg) {
+        printf("[spatial_decoder] num_channels=%d\n", frame->num_channels);
+        fflush(stdout);
+    }
     
     // Bounds check
     if (frame->num_channels > 8) {
@@ -395,8 +410,10 @@ int spatial_decoder_receive_frame(spatial_decoder_t* decoder, spatial_frame_t* f
         }
     }
     
-    printf("[spatial_decoder] receive_frame done\n");
-    fflush(stdout);
+    if (frame_dbg) {
+        printf("[spatial_decoder] receive_frame done\n");
+        fflush(stdout);
+    }
     return 0;
 }
 
