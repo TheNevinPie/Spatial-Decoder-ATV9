@@ -236,9 +236,14 @@ static void test_downsample_rates(void) {
 static void test_capacity_edges(void) {
     printf("\n=== Test: capacity edges ===\n");
     // 44.1k, nb chosen so need lands just over a small cap.
-    spatial_pcm_converter_t* conv = make_conv(2, 44100, 2, 48000, 2);
-    guard_planes_t* in = planes_alloc(2, 64);
-    guard_planes_t* out = planes_alloc(2, 64);
+    // NOTE: planar formats here so each plane holds `count` samples;
+    // interleaved packing (channels x count in plane 0) is covered by
+    // test_interleaved_parity with appropriately sized planes.
+    spatial_pcm_converter_t* conv = make_conv(6, 44100, 6, 48000, 2);
+    // Planes sized above every CLAIMED capacity below (64-sample input,
+    // up to 70-sample claimed output): the guards must survive all calls.
+    guard_planes_t* in = planes_alloc(2, 128);
+    guard_planes_t* out = planes_alloc(2, 128);
     fill_dc_fltp(in->ptrs, 2, 64, 0.5f);
     // need = floor(64*48000/44100)+1 = 69+1 = 70.
     int produced = -1;
